@@ -1,8 +1,12 @@
 import type { Id } from '../_generated/dataModel'
 import type { MutationCtx } from '../_generated/server'
-import { formatMissionReference, formatOptionReference } from '../../shared/reference'
+import {
+  formatIncidentReference,
+  formatMissionReference,
+  formatOptionReference,
+} from '../../shared/reference'
 
-type WorkflowCounterKind = 'OPTION' | 'MISSION'
+type WorkflowCounterKind = 'OPTION' | 'MISSION' | 'INCIDENT'
 
 function utcDateKey(now: Date) {
   return [
@@ -29,9 +33,11 @@ export async function generateWorkflowReference(
     .unique()
 
   const sequence = (counter?.sequence ?? 0) + 1
-  const reference = kind === 'OPTION'
-    ? formatOptionReference(now, sequence)
-    : formatMissionReference(now, sequence)
+  const reference = {
+    OPTION: formatOptionReference,
+    MISSION: formatMissionReference,
+    INCIDENT: formatIncidentReference,
+  }[kind](now, sequence)
 
   const duplicate = kind === 'OPTION'
     ? await ctx.db
@@ -39,11 +45,17 @@ export async function generateWorkflowReference(
         .withIndex('by_organization_reference', query =>
           query.eq('organizationId', organizationId).eq('reference', reference))
         .unique()
-    : await ctx.db
-        .query('missions')
-        .withIndex('by_organization_reference', query =>
-          query.eq('organizationId', organizationId).eq('reference', reference))
-        .unique()
+    : kind === 'MISSION'
+      ? await ctx.db
+          .query('missions')
+          .withIndex('by_organization_reference', query =>
+            query.eq('organizationId', organizationId).eq('reference', reference))
+          .unique()
+      : await ctx.db
+          .query('incidents')
+          .withIndex('by_organization_reference', query =>
+            query.eq('organizationId', organizationId).eq('reference', reference))
+          .unique()
 
   if (duplicate)
     throw new Error('WORKFLOW_REFERENCE_CONFLICT')

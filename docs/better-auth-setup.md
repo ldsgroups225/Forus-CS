@@ -228,6 +228,9 @@ GOOGLE_CLIENT_ID
 GOOGLE_CLIENT_SECRET
 GITHUB_CLIENT_ID
 GITHUB_CLIENT_SECRET
+AUTH_EMAIL_WEBHOOK_URL
+AUTH_EMAIL_WEBHOOK_SECRET
+BETTER_AUTH_REQUIRE_EMAIL_VERIFICATION
 ```
 
 Set provider secrets with `pnpm exec convex env set`; never expose them with
@@ -239,16 +242,19 @@ https://<deployment>.convex.site/api/auth/callback/<provider>
 
 ## Required environment variables
 
-| Scope             | Variable                      | Required  | Purpose                         |
-| ----------------- | ----------------------------- | --------- | ------------------------------- |
-| Convex deployment | `BETTER_AUTH_SECRET`          | Yes       | Session encryption and hashing  |
-| Convex deployment | `SITE_URL`                    | Yes       | Trusted application origin      |
-| Convex runtime    | `CONVEX_SITE_URL`             | Automatic | Better Auth HTTP base URL       |
-| Local CLI         | `CONVEX_DEPLOYMENT`           | Yes       | Selected development deployment |
-| Nuxt public       | `NUXT_PUBLIC_CONVEX_URL`      | Yes       | Convex WebSocket/API URL        |
-| Nuxt public       | `NUXT_PUBLIC_CONVEX_SITE_URL` | Yes       | Better Auth HTTP URL            |
-| Nuxt public       | `NUXT_PUBLIC_SITE_URL`        | Yes       | Browser application origin      |
-| Convex deployment | Provider client IDs/secrets   | Optional  | OAuth providers only            |
+| Scope             | Variable                                 | Required  | Purpose                         |
+| ----------------- | ---------------------------------------- | --------- | ------------------------------- |
+| Convex deployment | `BETTER_AUTH_SECRET`                     | Yes       | Session encryption and hashing  |
+| Convex deployment | `SITE_URL`                               | Yes       | Trusted application origin      |
+| Convex runtime    | `CONVEX_SITE_URL`                        | Automatic | Better Auth HTTP base URL       |
+| Local CLI         | `CONVEX_DEPLOYMENT`                      | Yes       | Selected development deployment |
+| Nuxt public       | `NUXT_PUBLIC_CONVEX_URL`                 | Yes       | Convex WebSocket/API URL        |
+| Nuxt public       | `NUXT_PUBLIC_CONVEX_SITE_URL`            | Yes       | Better Auth HTTP URL            |
+| Nuxt public       | `NUXT_PUBLIC_SITE_URL`                   | Yes       | Browser application origin      |
+| Convex deployment | Provider client IDs/secrets              | Optional  | OAuth providers only            |
+| Convex deployment | `AUTH_EMAIL_WEBHOOK_URL`                 | Optional  | Password reset and verification |
+| Convex deployment | `AUTH_EMAIL_WEBHOOK_SECRET`              | Optional  | Webhook authentication          |
+| Convex deployment | `BETTER_AUTH_REQUIRE_EMAIL_VERIFICATION` | Optional  | Require verified e-mail         |
 
 ## Verification
 

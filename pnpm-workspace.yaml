@@ -36,6 +36,7 @@ catalogs:
     vite: ^8.1.5
   dev:
     '@antfu/eslint-config': ^9.2.0
+    '@playwright/test': ^1.62.0
     '@types/node': ^24.13.3
     eslint: ^10.8.0
     eslint-plugin-format: ^2.0.1

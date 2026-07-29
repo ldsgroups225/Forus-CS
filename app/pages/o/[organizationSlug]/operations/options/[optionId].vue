@@ -38,6 +38,9 @@ const canDecide = computed(() =>
   organization.value?.role === 'ORGANIZATION_ADMIN'
   || organization.value?.role === 'OPERATIONS_MANAGER',
 )
+const canReview = computed(() =>
+  canDecide.value || organization.value?.role === 'SUPERVISOR',
+)
 const maximumAcceptedCount = computed(() => option.value
   ? Math.min(option.value.proposedTruckCount, option.value.needRemainingTruckCount)
   : 1,
@@ -47,6 +50,7 @@ const reviseValues = computed<CarrierOptionFormValues | undefined>(() => {
     return undefined
 
   return {
+    carrierId: option.value.carrierId ?? '',
     carrierName: option.value.carrierName,
     carrierPhone: option.value.carrierPhone ?? '',
     carrierEmail: option.value.carrierEmail ?? '',
@@ -80,6 +84,7 @@ watch(maximumAcceptedCount, (value) => {
 function optionInput(values: CarrierOptionFormValues) {
   return {
     optionId: optionId.value,
+    carrierId: values.carrierId ? values.carrierId as Id<'carriers'> : undefined,
     carrierName: values.carrierName,
     carrierPhone: values.carrierPhone || undefined,
     carrierEmail: values.carrierEmail || undefined,
@@ -110,6 +115,16 @@ async function acceptOption() {
     acceptOpen.value = false
     actionSuccess.value = 'Option acceptée : la mission est confirmée et le besoin a été mis à jour.'
     return missionId
+  })
+}
+
+async function validateOption() {
+  await runAction(async () => {
+    await $convex.mutation(api.carrierOptions.validate, {
+      optionId: optionId.value,
+      reviewNote: decisionNote.value.trim() || undefined,
+    })
+    actionSuccess.value = 'Option contrôlée par le superviseur et transmise aux Opérations.'
   })
 }
 
@@ -172,6 +187,7 @@ async function runAction(action: () => Promise<unknown>) {
 function auditLabel(action: string) {
   return {
     SUBMIT: 'Option soumise',
+    VALIDATE: 'Option validée par le superviseur',
     NEGOTIATE: 'Négociation demandée',
     REVISE: 'Option révisée',
     ACCEPT: 'Option acceptée',
@@ -222,14 +238,20 @@ function auditLabel(action: string) {
             </template>
             Réviser
           </AppButton>
-          <template v-if="canDecide && (option.status === 'PENDING' || option.status === 'NEGOTIATION')">
+          <AppButton v-if="canReview && option.status === 'PENDING'" variant="success" :loading="loadingAction" @click="validateOption">
+            <template #leading>
+              <span class="i-carbon-checked" />
+            </template>
+            Valider la conformité
+          </AppButton>
+          <template v-if="canDecide && option.status === 'VALIDATED'">
             <AppButton variant="success" @click="acceptOpen = true">
               <template #leading>
                 <span class="i-carbon-checkmark" />
               </template>
               Accepter
             </AppButton>
-            <AppButton v-if="option.status === 'PENDING'" variant="secondary" @click="negotiateOpen = true">
+            <AppButton variant="secondary" @click="negotiateOpen = true">
               Négocier
             </AppButton>
             <AppButton variant="danger" @click="refuseOpen = true">

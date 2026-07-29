@@ -1,6 +1,12 @@
 import { api } from '../../convex/_generated/api'
 
-const publicRoutes = new Set(['/login', '/register', '/offline'])
+const publicRoutes = new Set([
+  '/login',
+  '/register',
+  '/forgot-password',
+  '/reset-password',
+  '/offline',
+])
 
 export default defineNuxtRouteMiddleware(async (to) => {
   if (import.meta.server)
@@ -28,14 +34,14 @@ export default defineNuxtRouteMiddleware(async (to) => {
   if (!isAuthenticated && !isPublic)
     return navigateTo({ path: '/login', query: { redirect: to.fullPath } })
 
-  if (isAuthenticated && (to.path === '/login' || to.path === '/register'))
-    return navigateTo(await destinationAfterAuthentication($convex))
-
   if (!isAuthenticated)
     return
 
   if (!await $ensureConvexAuth())
     return navigateTo({ path: '/login', query: { redirect: to.fullPath } })
+
+  if (to.path === '/login' || to.path === '/register')
+    return navigateTo(await destinationAfterAuthentication($convex))
 
   const organizations = await $convex.query(api.organizations.listForCurrentUser, {})
 
@@ -50,6 +56,9 @@ export default defineNuxtRouteMiddleware(async (to) => {
       return navigateTo(`/o/${first.slug}/operations`)
     return
   }
+
+  if (to.path.startsWith('/invite/'))
+    return
 
   if (organizations.length === 0)
     return navigateTo('/onboarding/organization')

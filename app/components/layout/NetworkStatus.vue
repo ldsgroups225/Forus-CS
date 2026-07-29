@@ -1,5 +1,6 @@
 <script setup lang="ts">
 const online = useOnline()
+const { pendingCount } = useOfflineMutationQueue()
 </script>
 
 <template>
@@ -12,5 +13,6 @@ const online = useOnline()
   >
     <span class="rounded-full bg-current h-1.5 w-1.5" :class="online && 'animate-pulse'" />
     {{ online ? 'En ligne' : 'Hors ligne' }}
+    <span v-if="pendingCount">· {{ pendingCount }} en attente</span>
   </div>
 </template>

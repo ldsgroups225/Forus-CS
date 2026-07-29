@@ -1,7 +1,7 @@
 import type { Doc, Id } from './_generated/dataModel'
 import type { MutationCtx, QueryCtx } from './_generated/server'
 import { v } from 'convex/values'
-import { applyOptionAcceptance } from '../shared/optionWorkflow'
+import { applyOptionAcceptance, canDecideValidatedOption } from '../shared/optionWorkflow'
 import { mutation, query } from './_generated/server'
 import { writeAuditLog } from './lib/audit'
 import { requireAuthenticatedUser, requireOrganizationAccess, requireRole } from './lib/authz'
@@ -14,12 +14,19 @@ const OPTION_SUBMIT_ROLES = [
   'AGENT',
 ] as const
 
+const OPTION_REVIEW_ROLES = [
+  'ORGANIZATION_ADMIN',
+  'OPERATIONS_MANAGER',
+  'SUPERVISOR',
+] as const
+
 const OPTION_DECISION_ROLES = [
   'ORGANIZATION_ADMIN',
   'OPERATIONS_MANAGER',
 ] as const
 
 const optionFields = {
+  carrierId: v.optional(v.id('carriers')),
   carrierName: v.string(),
   carrierPhone: v.optional(v.string()),
   carrierEmail: v.optional(v.string()),
@@ -33,6 +40,7 @@ const optionFields = {
 }
 
 interface OptionInput {
+  carrierId?: Id<'carriers'>
   carrierName: string
   carrierPhone?: string
   carrierEmail?: string
@@ -66,6 +74,7 @@ function normalizeOptionInput(input: OptionInput): OptionInput {
     throw new Error('OPTION_EMAIL_INVALID')
 
   return {
+    carrierId: input.carrierId,
     carrierName: input.carrierName.trim(),
     carrierPhone: input.carrierPhone?.trim() || undefined,
     carrierEmail: carrierEmail || undefined,
@@ -137,6 +146,22 @@ export const create = mutation({
       throw new Error('OPTION_NEED_NOT_ACTIVE')
 
     const input = normalizeOptionInput(args)
+    const carrierId = input.carrierId
+    if (carrierId) {
+      const carrier = await ctx.db.get(carrierId)
+      if (!carrier || carrier.organizationId !== args.organizationId || !carrier.isActive)
+        throw new Error('OPTION_CARRIER_INVALID')
+      const { membership } = await requireOrganizationAccess(ctx, args.organizationId)
+      if (membership.role === 'AGENT') {
+        const assignment = await ctx.db
+          .query('carrierAssignments')
+          .withIndex('by_organization_carrier', query =>
+            query.eq('organizationId', args.organizationId).eq('carrierId', carrierId))
+          .unique()
+        if (!assignment || assignment.agentId !== userId)
+          throw new Error('OPTION_CARRIER_NOT_ASSIGNED')
+      }
+    }
     if (input.proposedTruckCount > need.remainingTruckCount)
       throw new Error('OPTION_PROPOSED_COUNT_EXCEEDS_REMAINING')
 
@@ -227,6 +252,42 @@ export const revise = mutation({
   },
 })
 
+export const validate = mutation({
+  args: {
+    optionId: v.id('carrierOptions'),
+    reviewNote: v.optional(v.string()),
+  },
+  handler: async (ctx, args) => {
+    const { userId } = await requireAuthenticatedUser(ctx)
+    const option = await requireOption(ctx, args.optionId)
+    await requireRole(ctx, option.organizationId, OPTION_REVIEW_ROLES)
+    if (option.status !== 'PENDING')
+      throw new Error('OPTION_NOT_PENDING')
+    if (!option.documentsConfirmed)
+      throw new Error('OPTION_DOCUMENTS_NOT_CONFIRMED')
+
+    const now = Date.now()
+    const reviewNote = args.reviewNote?.trim() || undefined
+    await ctx.db.patch(args.optionId, {
+      status: 'VALIDATED',
+      decisionNote: reviewNote,
+      updatedAt: now,
+      updatedBy: userId,
+    })
+    await writeAuditLog(ctx, {
+      organizationId: option.organizationId,
+      actorId: userId,
+      entityType: 'carrierOption',
+      entityId: args.optionId,
+      action: 'VALIDATE',
+      previousValue: { status: option.status },
+      newValue: { status: 'VALIDATED', reviewNote },
+    })
+
+    return args.optionId
+  },
+})
+
 export const negotiate = mutation({
   args: {
     optionId: v.id('carrierOptions'),
@@ -238,8 +299,8 @@ export const negotiate = mutation({
     await requireOrganizationAccess(ctx, option.organizationId)
     await requireRole(ctx, option.organizationId, OPTION_DECISION_ROLES)
 
-    if (option.status !== 'PENDING')
-      throw new Error('OPTION_NOT_PENDING')
+    if (!canDecideValidatedOption(option.status))
+      throw new Error('OPTION_NOT_DECIDABLE')
     const decisionNote = args.decisionNote.trim()
     if (decisionNote.length < 2)
       throw new Error('OPTION_DECISION_NOTE_REQUIRED')
@@ -278,7 +339,7 @@ export const refuse = mutation({
     await requireOrganizationAccess(ctx, option.organizationId)
     await requireRole(ctx, option.organizationId, OPTION_DECISION_ROLES)
 
-    if (option.status !== 'PENDING' && option.status !== 'NEGOTIATION')
+    if (!canDecideValidatedOption(option.status))
       throw new Error('OPTION_FINAL_STATE')
     const decisionNote = args.decisionNote.trim()
     if (decisionNote.length < 2)
@@ -319,7 +380,7 @@ export const accept = mutation({
     await requireOrganizationAccess(ctx, option.organizationId)
     await requireRole(ctx, option.organizationId, OPTION_DECISION_ROLES)
 
-    if (option.status !== 'PENDING' && option.status !== 'NEGOTIATION')
+    if (!canDecideValidatedOption(option.status))
       throw new Error('OPTION_FINAL_STATE')
 
     const existingMission = await ctx.db
@@ -353,6 +414,7 @@ export const accept = mutation({
       organizationId: option.organizationId,
       needId: option.needId,
       optionId: args.optionId,
+      carrierId: option.carrierId,
       reference: missionReference,
       carrierName: option.carrierName,
       carrierPhone: option.carrierPhone,
@@ -367,6 +429,14 @@ export const accept = mutation({
       createdAt: now,
       createdBy: userId,
       lastUpdatedAt: now,
+    })
+    await ctx.db.insert('missionEvents', {
+      organizationId: option.organizationId,
+      missionId,
+      status: 'CONFIRMED',
+      note: 'Mission créée depuis une option acceptée.',
+      createdAt: now,
+      createdBy: userId,
     })
 
     await ctx.db.patch(args.optionId, {

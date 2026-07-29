@@ -21,6 +21,8 @@ const props = defineProps<{
     loadingLocation: string
     destination: string
     mobilizationAt: number
+    progress: number
+    incidentCount: number
   }
   organizationSlug: string
 }>()
@@ -93,11 +95,26 @@ const message = computed(() => [
       </div>
     </dl>
 
-    <div v-if="mission.carrierPhone" class="mt-4 gap-2 grid grid-cols-2">
-      <a :href="buildPhoneUrl(mission.carrierPhone)" class="text-xs font-800 px-3 py-2 border border-[var(--color-border-strong)] rounded-xl flex gap-2 min-h-11 items-center justify-center hover:border-[var(--color-accent)]">
+    <div class="mt-4">
+      <div class="text-[10px] text-[var(--color-text-subtle)] mb-1 flex justify-between">
+        <span>Progression</span><strong>{{ mission.progress }} %</strong>
+      </div>
+      <div class="rounded-full bg-[var(--color-bg-deep)] h-2 overflow-hidden">
+        <span class="rounded-full bg-[var(--color-accent)] h-full block" :style="{ width: `${mission.progress}%` }" />
+      </div>
+    </div>
+
+    <div class="mt-4 gap-2 grid" :class="mission.carrierPhone ? 'grid-cols-3' : 'grid-cols-1'">
+      <NuxtLink :to="`/o/${organizationSlug}/operations/missions/${mission._id}`" class="text-xs font-800 px-3 py-2 border border-[var(--color-border-strong)] rounded-xl flex gap-2 min-h-11 items-center justify-center hover:border-[var(--color-accent)]">
+        Détail
+        <AppBadge v-if="mission.incidentCount" tone="danger">
+          {{ mission.incidentCount }}
+        </AppBadge>
+      </NuxtLink>
+      <a v-if="mission.carrierPhone" :href="buildPhoneUrl(mission.carrierPhone)" class="text-xs font-800 px-3 py-2 border border-[var(--color-border-strong)] rounded-xl flex gap-2 min-h-11 items-center justify-center hover:border-[var(--color-accent)]">
         <span class="i-carbon-phone-filled text-[var(--color-accent)]" /> Appeler
       </a>
-      <a :href="buildWhatsAppUrl(mission.carrierPhone, message)" target="_blank" rel="noopener noreferrer" class="text-xs text-green-300 font-800 px-3 py-2 border border-green-500/30 rounded-xl bg-green-500/8 flex gap-2 min-h-11 items-center justify-center hover:bg-green-500/15">
+      <a v-if="mission.carrierPhone" :href="buildWhatsAppUrl(mission.carrierPhone, message)" target="_blank" rel="noopener noreferrer" class="text-xs text-green-300 font-800 px-3 py-2 border border-green-500/30 rounded-xl bg-green-500/8 flex gap-2 min-h-11 items-center justify-center hover:bg-green-500/15">
         <span class="i-carbon-logo-whatsapp" /> WhatsApp
       </a>
     </div>

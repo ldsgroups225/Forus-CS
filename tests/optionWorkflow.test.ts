@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { applyOptionAcceptance } from '../shared/optionWorkflow'
+import { applyOptionAcceptance, canDecideValidatedOption } from '../shared/optionWorkflow'
 
 describe('applyOptionAcceptance', () => {
   it('crée une progression partielle sans dépasser la proposition', () => {
@@ -35,5 +35,15 @@ describe('applyOptionAcceptance', () => {
       .toThrow('OPTION_ACCEPTED_COUNT_INVALID')
     expect(() => applyOptionAcceptance(5, 0, 1, 0.5))
       .toThrow('OPTION_ACCEPTED_COUNT_INVALID')
+  })
+})
+
+describe('canDecideValidatedOption', () => {
+  it('autorise uniquement une option validée par le superviseur', () => {
+    expect(canDecideValidatedOption('VALIDATED')).toBe(true)
+    expect(canDecideValidatedOption('PENDING')).toBe(false)
+    expect(canDecideValidatedOption('NEGOTIATION')).toBe(false)
+    expect(canDecideValidatedOption('ACCEPTED')).toBe(false)
+    expect(canDecideValidatedOption('REFUSED')).toBe(false)
   })
 })

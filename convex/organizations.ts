@@ -4,6 +4,7 @@ import { writeAuditLog } from './lib/audit'
 import {
   requireAuthenticatedUser,
   requireOrganizationAccess,
+  requireRole,
 } from './lib/authz'
 
 const slugPattern = /^[a-z0-9]+(?:-[a-z0-9]+)*$/
@@ -109,5 +110,105 @@ export const getBySlug = query({
       ...organization,
       role: membership.role,
     }
+  },
+})
+
+export const getSettings = query({
+  args: {
+    organizationId: v.id('organizations'),
+  },
+  handler: async (ctx, args) => {
+    await requireOrganizationAccess(ctx, args.organizationId)
+    const settings = await ctx.db
+      .query('organizationSettings')
+      .withIndex('by_organization', query => query.eq('organizationId', args.organizationId))
+      .unique()
+
+    return settings ?? {
+      organizationId: args.organizationId,
+      timezone: 'Africa/Abidjan',
+      currency: 'XOF',
+      defaultCountryCode: '225',
+      whatsappBusinessEnabled: false,
+      agentBaseStipend: 50_000,
+      maximumPerformanceBonus: 50_000,
+      updatedAt: 0,
+      updatedBy: '',
+    }
+  },
+})
+
+export const updateSettings = mutation({
+  args: {
+    organizationId: v.id('organizations'),
+    name: v.string(),
+    timezone: v.string(),
+    currency: v.string(),
+    defaultCountryCode: v.string(),
+    whatsappBusinessEnabled: v.boolean(),
+    agentBaseStipend: v.number(),
+    maximumPerformanceBonus: v.number(),
+  },
+  handler: async (ctx, args) => {
+    const { userId } = await requireAuthenticatedUser(ctx)
+    await requireRole(ctx, args.organizationId, ['ORGANIZATION_ADMIN'])
+    const name = args.name.trim()
+    const timezone = args.timezone.trim()
+    const currency = args.currency.trim().toUpperCase()
+    const defaultCountryCode = args.defaultCountryCode.replace(/\D/g, '')
+
+    if (name.length < 2)
+      throw new Error('ORGANIZATION_NAME_TOO_SHORT')
+    if (!timezone.includes('/'))
+      throw new Error('ORGANIZATION_TIMEZONE_INVALID')
+    if (!/^[A-Z]{3}$/.test(currency))
+      throw new Error('ORGANIZATION_CURRENCY_INVALID')
+    if (defaultCountryCode.length < 1 || defaultCountryCode.length > 4)
+      throw new Error('ORGANIZATION_COUNTRY_CODE_INVALID')
+    if (args.agentBaseStipend < 0 || args.maximumPerformanceBonus < 0)
+      throw new Error('ORGANIZATION_BONUS_INVALID')
+
+    const organization = await ctx.db.get(args.organizationId)
+    if (!organization)
+      throw new Error('ORGANIZATION_NOT_FOUND')
+
+    const now = Date.now()
+    const settings = await ctx.db
+      .query('organizationSettings')
+      .withIndex('by_organization', query => query.eq('organizationId', args.organizationId))
+      .unique()
+    const values = {
+      organizationId: args.organizationId,
+      timezone,
+      currency,
+      defaultCountryCode,
+      whatsappBusinessEnabled: args.whatsappBusinessEnabled,
+      agentBaseStipend: args.agentBaseStipend,
+      maximumPerformanceBonus: args.maximumPerformanceBonus,
+      updatedAt: now,
+      updatedBy: userId,
+    }
+
+    await ctx.db.patch(args.organizationId, {
+      name,
+      updatedAt: now,
+      updatedBy: userId,
+    })
+    if (settings)
+      await ctx.db.patch(settings._id, values)
+    else
+      await ctx.db.insert('organizationSettings', values)
+
+    await writeAuditLog(ctx, {
+      organizationId: args.organizationId,
+      actorId: userId,
+      entityType: 'organization',
+      entityId: args.organizationId,
+      action: 'UPDATE_SETTINGS',
+      previousValue: { name: organization.name, settings },
+      newValue: { name, ...values },
+    })
+
+    return args.organizationId
   },
 })

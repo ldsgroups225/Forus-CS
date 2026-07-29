@@ -1,3 +1,4 @@
+import type { CarrierOptionStatus } from './domain'
 import { deriveNeedProgress } from './needProgress'
 
 export interface OptionAcceptanceResult {
@@ -39,4 +40,8 @@ export function applyOptionAcceptance(
     remainingTruckCount: nextProgress.remainingTruckCount,
     status: nextProgress.status,
   }
+}
+
+export function canDecideValidatedOption(status: CarrierOptionStatus): boolean {
+  return status === 'VALIDATED'
 }

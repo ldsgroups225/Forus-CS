@@ -28,6 +28,11 @@ const auditArgs = computed(() => organization.value && need.value
 const { data: auditLogs } = useConvexQuery(api.auditLogs.listForEntity, auditArgs)
 const optionArgs = computed(() => need.value ? { needId: need.value._id } : null)
 const { data: carrierOptions } = useConvexQuery(api.carrierOptions.listForNeed, optionArgs)
+const { data: carrierMatches } = useConvexQuery(api.matching.listForNeed, optionArgs)
+const { data: carriers } = useConvexQuery(api.carriers.list, computed(() =>
+  organization.value
+    ? { organizationId: organization.value._id }
+    : null))
 
 const editOpen = ref(false)
 const cancelOpen = ref(false)
@@ -148,6 +153,7 @@ async function submitCarrierOption(values: CarrierOptionFormValues) {
     await $convex.mutation(api.carrierOptions.create, {
       organizationId: organization.value._id,
       needId: need.value._id,
+      carrierId: values.carrierId ? values.carrierId as Id<'carriers'> : undefined,
       carrierName: values.carrierName,
       carrierPhone: values.carrierPhone || undefined,
       carrierEmail: values.carrierEmail || undefined,
@@ -341,6 +347,45 @@ function auditLabel(action: string) {
           </AppCard>
 
           <AppCard>
+            <div class="mb-5 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+              <div>
+                <h2 class="text-base font-800 m-0">
+                  Matching transporteurs
+                </h2>
+                <p class="text-xs text-[var(--color-text-muted)] mb-0 mt-1">
+                  Classement explicable selon camion, destination, disponibilité, documents et portefeuille.
+                </p>
+              </div>
+              <AppBadge tone="accent">
+                {{ carrierMatches?.length ?? 0 }} suggestion(s)
+              </AppBadge>
+            </div>
+            <p v-if="!carrierMatches?.length" class="text-sm text-[var(--color-text-muted)] m-0">
+              Aucun transporteur compatible n’est encore qualifié dans le CRM.
+            </p>
+            <div v-else class="gap-3 grid sm:grid-cols-2">
+              <NuxtLink
+                v-for="match in carrierMatches.slice(0, 6)"
+                :key="match.carrierId"
+                :to="`/o/${organization?.slug}/operations/transporteurs/${match.carrierId}`"
+                class="p-3 border border-[var(--color-border)] rounded-xl bg-[var(--color-bg-deep)] hover:border-[var(--color-accent)]"
+              >
+                <div class="flex gap-2 items-center justify-between">
+                  <strong class="text-sm">{{ match.carrier?.name }}</strong>
+                  <AppBadge :tone="match.score >= 70 ? 'success' : match.score >= 40 ? 'warning' : 'neutral'">
+                    {{ match.score }} %
+                  </AppBadge>
+                </div>
+                <ul class="text-[10px] text-[var(--color-text-muted)] mb-0 mt-2 pl-4">
+                  <li v-for="reason in match.reasons" :key="reason">
+                    {{ reason }}
+                  </li>
+                </ul>
+              </NuxtLink>
+            </div>
+          </AppCard>
+
+          <AppCard>
             <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
               <div>
                 <h2 class="text-base font-800 m-0">
@@ -396,6 +441,7 @@ function auditLabel(action: string) {
               <CarrierOptionForm
                 :truck-type="need.truckType"
                 :maximum-truck-count="need.remainingTruckCount"
+                :carriers="carriers ?? []"
                 :loading="loadingAction"
                 @submit="submitCarrierOption"
                 @cancel="optionOpen = false"

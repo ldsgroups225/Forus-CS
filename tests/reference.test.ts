@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import {
+  formatIncidentReference,
   formatMissionReference,
   formatNeedReference,
   formatOptionReference,
@@ -27,5 +28,6 @@ describe('formatNeedReference', () => {
     const date = new Date('2026-07-29T08:00:00Z')
     expect(formatOptionReference(date, 7)).toBe('OPT-2026-07-29-007')
     expect(formatMissionReference(date, 12)).toBe('MS-2026-07-29-012')
+    expect(formatIncidentReference(date, 3)).toBe('INC-2026-07-29-003')
   })
 })

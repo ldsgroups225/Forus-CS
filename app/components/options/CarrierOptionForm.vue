@@ -8,10 +8,18 @@ const props = withDefaults(defineProps<{
   maximumTruckCount: number
   loading?: boolean
   submitLabel?: string
+  carriers?: readonly {
+    _id: string
+    name: string
+    phone: string
+    email?: string
+    truckTypes: readonly string[]
+  }[]
 }>(), {
   truckType: '',
   loading: false,
   submitLabel: 'Soumettre l’option',
+  carriers: () => [],
 })
 
 const emit = defineEmits<{
@@ -24,6 +32,26 @@ const form = reactive<CarrierOptionFormValues>({
   ...props.initialValue,
 })
 const errors = reactive<Record<string, string>>({})
+const carrierOptions = computed(() => [
+  { value: '', label: 'Saisie manuelle' },
+  ...props.carriers.map(carrier => ({ value: carrier._id, label: carrier.name })),
+])
+
+watch(
+  () => form.carrierId,
+  (carrierId) => {
+    if (!carrierId)
+      return
+    const carrier = props.carriers.find(item => item._id === carrierId)
+    if (!carrier)
+      return
+    form.carrierName = carrier.name
+    form.carrierPhone = carrier.phone
+    form.carrierEmail = carrier.email ?? ''
+    if (!form.truckType && carrier.truckTypes[0])
+      form.truckType = carrier.truckTypes[0]
+  },
+)
 
 function validate() {
   Object.keys(errors).forEach(key => delete errors[key])
@@ -73,6 +101,9 @@ function submit() {
     </div>
 
     <div class="gap-4 grid sm:grid-cols-2">
+      <AppFormField v-if="carriers.length" label="Transporteur du CRM" for="option-carrier-id">
+        <AppSelect id="option-carrier-id" v-model="form.carrierId" :options="carrierOptions" />
+      </AppFormField>
       <AppFormField label="Transporteur" for="option-carrier" :error="errors.carrierName" required>
         <AppInput id="option-carrier" v-model="form.carrierName" autocomplete="organization" placeholder="TransLog SARL" />
       </AppFormField>

@@ -67,6 +67,7 @@ export default defineNuxtConfig({
   },
 
   routeRules: {
+    '/': { ssr: false },
     '/login': { ssr: false },
     '/register': { ssr: false },
     '/onboarding/**': { ssr: false },

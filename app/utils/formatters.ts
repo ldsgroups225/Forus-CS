@@ -86,6 +86,7 @@ export function needUrgencyTone(urgency: NeedUrgency) {
 export function carrierOptionStatusTone(status: CarrierOptionStatus) {
   return {
     PENDING: 'warning',
+    VALIDATED: 'info',
     NEGOTIATION: 'info',
     ACCEPTED: 'success',
     REFUSED: 'danger',
@@ -95,5 +96,11 @@ export function carrierOptionStatusTone(status: CarrierOptionStatus) {
 export function missionStatusTone(status: MissionStatus) {
   return {
     CONFIRMED: 'success',
-  }[status] as 'success'
+    MOBILIZING: 'info',
+    LOADING: 'warning',
+    IN_TRANSIT: 'info',
+    DELIVERED: 'success',
+    COMPLETED: 'success',
+    CANCELLED: 'danger',
+  }[status] as 'success' | 'info' | 'warning' | 'danger'
 }

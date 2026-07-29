@@ -2,7 +2,7 @@
 
 PWA SaaS multi-tenant pour piloter les besoins de transport de FORUS.
 
-La première verticale fonctionnelle couvre :
+Le socle fonctionnel couvre :
 
 1. inscription et connexion ;
 2. création ou sélection d’une organisation ;
@@ -11,7 +11,11 @@ La première verticale fonctionnelle couvre :
 5. consultation, modification et annulation ;
 6. soumission, négociation, acceptation ou refus d’une option transporteur ;
 7. création atomique d’une mission et mise à jour des camions approuvés ;
-8. audit des actions importantes.
+8. CRM clients et transporteurs, véhicules, chauffeurs, documents et disponibilités ;
+9. équipes, invitations, rôles, superviseurs et portefeuilles exclusifs ;
+10. appels, relances, notifications, incidents, rapports et KPI ;
+11. reprise idempotente de certaines créations hors ligne ;
+12. audit des actions importantes.
 
 ## Architecture
 
@@ -19,7 +23,7 @@ La première verticale fonctionnelle couvre :
 - UnoCSS et variables CSS pour le design system ;
 - Better Auth Vue pour les sessions ;
 - Convex pour les données métier, les requêtes temps réel et l’autorisation ;
-- Pinia réservé aux futurs états locaux d’interface ;
+- Pinia réservé aux états locaux d’interface ;
 - Vite PWA pour l’installation et la consultation des pages déjà chargées.
 
 Le serveur Nitro rend l’App Shell, l’accueil et l’écran hors ligne. Les routes
@@ -27,10 +31,10 @@ d’authentification et métier (`/login`, `/register`, `/onboarding/**`, `/o/**
 sont rendues côté client : elles dépendent du bridge navigateur Better
 Auth–Convex et de ses abonnements temps réel.
 
-Chaque fonction Convex vérifie le membership de l’utilisateur dans
-l’organisation ciblée. Les écritures sur les besoins et les décisions d’option
-sont réservées aux rôles `ORGANIZATION_ADMIN` et `OPERATIONS_MANAGER`. Tous les
-membres actifs peuvent soumettre une option ; chaque acceptation crée une seule
+Chaque fonction Convex vérifie le membership et le rôle dans l’organisation
+ciblée. Les agents n’accèdent qu’aux transporteurs de leur portefeuille pour les
+écritures sensibles. Le superviseur valide les options ; la décision commerciale
+reste réservée au Responsable Opérations. Chaque acceptation crée une seule
 mission et met à jour la progression du besoin dans la même transaction Convex.
 
 ## Prérequis
@@ -72,6 +76,10 @@ printf 'http://localhost:3000' | pnpm exec convex env set SITE_URL
 
 Ne préfixez jamais ces secrets avec `NUXT_PUBLIC_`.
 
+Les variables privées facultatives (e-mail, vérification et OAuth) ainsi que la
+checklist de production sont décrites dans
+[`docs/production-runbook.md`](./docs/production-runbook.md).
+
 Le guide d’intégration détaillé est disponible dans
 [`docs/better-auth-setup.md`](./docs/better-auth-setup.md).
 
@@ -97,7 +105,7 @@ Pour tester le service worker en développement :
 pnpm dev:pwa
 ```
 
-## Données de démonstration
+## Données de démonstration et flotte initiale
 
 Après inscription, utilisez **Charger la démonstration FORUS** sur l’écran de
 création d’organisation. Le bouton n’existe qu’en développement et la mutation
@@ -105,6 +113,17 @@ refuse aussi de s’exécuter lorsque `SITE_URL` ne pointe pas vers localhost.
 
 Le seed crée `FORUS GROUP`, trois clients et huit besoins. Il est idempotent
 pour chaque utilisateur connecté.
+
+Un importeur séparé lit le classeur FORUS sans le copier dans Git. Il est
+idempotent, limité au développement et protégé par une clé privée Convex.
+Le mode par défaut charge un échantillon de 25 transporteurs :
+
+```bash
+pnpm seed:fleet /chemin/Parc_FORUS_reparti_4_agents_par_type_camion.xlsx --dry-run
+```
+
+La procédure d’import, les volumes et la provenance sont documentés dans
+[`docs/initial-fleet-seed.md`](./docs/initial-fleet-seed.md).
 
 ## Contrôles qualité
 
@@ -114,14 +133,17 @@ pnpm lint
 pnpm typecheck
 pnpm test
 pnpm build
+pnpm e2e
 ```
 
-Les tests couvrent le calcul de progression, le reste à trouver, les références,
-l’acceptation partielle ou complète d’une option et l’isolement multi-tenant.
+Les tests unitaires couvrent progression, références, autorisation multi-tenant,
+options, missions, incidents, matching et KPI. Playwright vérifie l’App Shell,
+les vues desktop/mobile, la PWA et, lorsque les secrets E2E sont configurés, le
+parcours Responsable Opérations sur un vrai backend.
 
 ## Hors ligne
 
 Le service worker met en cache l’App Shell et les navigations déjà chargées.
-Les mutations métier ne sont pas mises en file dans cette version. Leur future
-frontière d’intégration est définie dans
-[`app/lib/offline-mutation-queue.ts`](./app/lib/offline-mutation-queue.ts).
+IndexedDB conserve de manière idempotente les nouvelles fiches client,
+transporteur, appel, relance et incident, puis les rejoue au retour du réseau.
+Les autres mutations métier restent volontairement en ligne uniquement.

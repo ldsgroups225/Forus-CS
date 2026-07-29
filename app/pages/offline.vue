@@ -17,7 +17,9 @@ watch(online, (value) => {
         Vous êtes hors ligne
       </h1>
       <p class="text-sm text-[var(--color-text-muted)] leading-6 mb-6">
-        Les écrans déjà consultés restent disponibles. Les écritures métier seront synchronisées dans une prochaine version.
+        Les écrans déjà consultés restent disponibles. Les nouvelles fiches client,
+        transporteur, appel, relance et incident sont mises en attente puis rejouées
+        automatiquement au retour du réseau.
       </p>
       <AppButton variant="secondary" @click="$router.back()">
         Revenir à l’écran précédent

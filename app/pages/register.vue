@@ -7,10 +7,12 @@ const email = ref('')
 const password = ref('')
 const confirmation = ref('')
 const errorMessage = ref('')
+const successMessage = ref('')
 const loading = ref(false)
 
 async function submit() {
   errorMessage.value = ''
+  successMessage.value = ''
 
   if (name.value.trim().length < 2) {
     errorMessage.value = 'Indiquez votre nom complet.'
@@ -43,6 +45,10 @@ async function submit() {
     }
 
     await session.value.refetch()
+    if (!session.value.data?.user) {
+      successMessage.value = 'Compte créé. Consultez votre e-mail pour confirmer votre adresse avant de vous connecter.'
+      return
+    }
     await navigateTo('/onboarding/organization')
   }
   catch {
@@ -84,6 +90,9 @@ async function submit() {
 
       <p v-if="errorMessage" class="text-sm text-red-300 px-3.5 py-3 border border-red-500/25 rounded-xl bg-red-500/10" role="alert">
         {{ errorMessage }}
+      </p>
+      <p v-if="successMessage" class="text-sm text-green-300 px-3.5 py-3 border border-green-500/25 rounded-xl bg-green-500/10" role="status">
+        {{ successMessage }}
       </p>
 
       <AppButton type="submit" :loading="loading" block size="lg">

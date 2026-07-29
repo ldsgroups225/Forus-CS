@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import { api } from '../../convex/_generated/api'
+
 definePageMeta({ layout: 'auth' })
 
 const route = useRoute()
@@ -8,6 +10,30 @@ const email = ref('')
 const password = ref('')
 const errorMessage = ref('')
 const loading = ref(false)
+const { data: authCapabilities } = useConvexQuery(api.auth.getCapabilities, {})
+const hasSocialProviders = computed(() =>
+  Boolean(authCapabilities.value?.google || authCapabilities.value?.github))
+
+async function signInWith(provider: 'google' | 'github') {
+  errorMessage.value = ''
+  loading.value = true
+  try {
+    const redirect = typeof route.query.redirect === 'string' ? route.query.redirect : '/'
+    const response = await authClient.signIn.social({
+      provider,
+      callbackURL: new URL(redirect, window.location.origin).toString(),
+      errorCallbackURL: `${window.location.origin}/login`,
+    })
+    if (response.error)
+      errorMessage.value = response.error.message || 'Connexion OAuth impossible.'
+  }
+  catch {
+    errorMessage.value = 'Le fournisseur de connexion est momentanément indisponible.'
+  }
+  finally {
+    loading.value = false
+  }
+}
 
 async function submit() {
   errorMessage.value = ''
@@ -93,7 +119,30 @@ async function submit() {
           <span class="i-carbon-arrow-right" />
         </template>
       </AppButton>
+      <NuxtLink to="/forgot-password" class="text-xs text-[var(--color-accent)] font-700 text-center block hover:underline">
+        Mot de passe oublié ?
+      </NuxtLink>
     </form>
+
+    <div v-if="hasSocialProviders" class="mt-6 pt-6 border-t border-[var(--color-border)]">
+      <p class="text-xs text-[var(--color-text-subtle)] mb-3 text-center">
+        Ou continuer avec
+      </p>
+      <div class="gap-2 grid sm:grid-cols-2">
+        <AppButton v-if="authCapabilities?.google" variant="secondary" :loading="loading" block @click="signInWith('google')">
+          <template #leading>
+            <AuthProviderIcon provider="google" />
+          </template>
+          Google
+        </AppButton>
+        <AppButton v-if="authCapabilities?.github" variant="secondary" :loading="loading" block @click="signInWith('github')">
+          <template #leading>
+            <AuthProviderIcon provider="github" />
+          </template>
+          GitHub
+        </AppButton>
+      </div>
+    </div>
 
     <p class="text-sm text-[var(--color-text-muted)] mb-0 mt-6 text-center">
       Première visite ?

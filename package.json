@@ -1,7 +1,7 @@
 {
   "type": "module",
   "private": true,
-  "packageManager": "pnpm@10.30.2",
+  "packageManager": "pnpm@11.17.0",
   "scripts": {
     "build": "vite-ssg build",
     "dev": "vite --port 3333 --open",
@@ -17,14 +17,19 @@
     "sizecheck": "npx vite-bundle-visualizer"
   },
   "dependencies": {
+    "@convex-dev/better-auth": "catalog:",
     "@unhead/vue": "catalog:frontend",
     "@unocss/reset": "catalog:frontend",
     "@vueuse/core": "catalog:frontend",
+    "better-auth": "catalog:",
+    "convex": "catalog:",
     "nprogress": "catalog:frontend",
     "pinia": "catalog:frontend",
+    "react": "catalog:",
     "vue": "catalog:frontend",
     "vue-i18n": "catalog:frontend",
-    "vue-router": "catalog:frontend"
+    "vue-router": "catalog:frontend",
+    "workbox-window": "catalog:frontend"
   },
   "devDependencies": {
     "@antfu/eslint-config": "catalog:dev",
@@ -32,8 +37,10 @@
     "@intlify/unplugin-vue-i18n": "catalog:build",
     "@shikijs/markdown-it": "catalog:build",
     "@types/markdown-it-link-attributes": "catalog:types",
+    "@types/node": "catalog:types",
     "@types/nprogress": "catalog:types",
     "@unocss/eslint-config": "catalog:build",
+    "@unocss/preset-web-fonts": "catalog:build",
     "@vitejs/plugin-vue": "catalog:build",
     "@vue-macros/volar": "catalog:dev",
     "@vue/test-utils": "catalog:dev",

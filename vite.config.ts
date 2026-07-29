@@ -21,7 +21,7 @@ import 'vitest/config'
 export default defineConfig({
   resolve: {
     alias: {
-      '~/': `${path.resolve(__dirname, 'src')}/`,
+      '~/': `${path.resolve(import.meta.dirname, 'src')}/`,
     },
   },
 
@@ -83,21 +83,25 @@ export default defineConfig({
     Markdown({
       wrapperClasses: 'prose prose-sm m-auto text-left',
       headEnabled: true,
-      async markdownItSetup(md) {
-        md.use(LinkAttributes, {
+      async markdownSetup(md) {
+        // markdown-exit is runtime-compatible with markdown-it plugins, but
+        // their independently published type definitions are not structural.
+        type MarkdownPlugin = Parameters<typeof md.use>[0]
+        md.use(LinkAttributes as unknown as MarkdownPlugin, {
           matcher: (link: string) => /^https?:\/\//.test(link),
           attrs: {
             target: '_blank',
             rel: 'noopener',
           },
         })
-        md.use(await Shiki({
+        const shiki = await Shiki({
           defaultColor: false,
           themes: {
             light: 'vitesse-light',
             dark: 'vitesse-dark',
           },
-        }))
+        })
+        md.use(shiki as unknown as MarkdownPlugin)
       },
     }),
 
@@ -135,7 +139,7 @@ export default defineConfig({
       runtimeOnly: true,
       compositionOnly: true,
       fullInstall: true,
-      include: [path.resolve(__dirname, 'locales/**')],
+      include: [path.resolve(import.meta.dirname, 'locales/**')],
     }),
 
     // https://github.com/webfansplz/vite-plugin-vue-devtools

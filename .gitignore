@@ -5,5 +5,8 @@ dist
 .output
 .nuxt
 .env
+!.env.example
 .idea/
 public/assets/fonts
+
+.env.local

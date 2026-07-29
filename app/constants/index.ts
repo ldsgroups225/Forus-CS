@@ -1,2 +1,2 @@
-export const appName = 'Forus CS'
-export const appDescription = 'Forus Call Center'
+export const appName = 'Forus CS — Forus Call Center'
+export const appDescription = 'Pilotez les besoins de transport de votre organisation en temps réel.'

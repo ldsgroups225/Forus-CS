@@ -17,7 +17,9 @@
     "start": "node .output/server/index.mjs",
     "start:generate": "npx serve .output/public",
     "lint": "eslint .",
-    "typecheck": "nuxt typecheck"
+    "typecheck": "nuxt typecheck",
+    "test": "vitest run",
+    "test:watch": "vitest"
   },
   "dependencies": {
     "@convex-dev/better-auth": "catalog:",
@@ -49,6 +51,7 @@
     "typescript": "catalog:dev",
     "unocss": "catalog:build",
     "vite": "catalog:build",
+    "vitest": "catalog:dev",
     "vue": "catalog:frontend",
     "vue-tsc": "catalog:dev"
   },

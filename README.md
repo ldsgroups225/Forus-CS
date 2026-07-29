@@ -1,65 +1,123 @@
-<p align="center">
-<img src="https://user-images.githubusercontent.com/11247099/140462375-7b7ac4db-35b7-453c-8a05-13d8d20282c4.png" alt="Vitesse" width="600"/>
-</p>
+# Forus CS — Forus Call Center
 
-<h2 align="center">
-Forus CS — Forus Call Center
-</h2><br>
+PWA SaaS multi-tenant pour piloter les besoins de transport de FORUS.
 
-<p align="center">
-<br>
-Built from <a href="https://github.com/antfu/vitesse-nuxt">Vitesse for Nuxt 4</a>.
-</p>
+La première verticale fonctionnelle couvre :
 
-## Features
+1. inscription et connexion ;
+2. création ou sélection d’une organisation ;
+3. création d’un besoin en brouillon ;
+4. publication et liste des besoins actifs ;
+5. consultation, modification et annulation ;
+6. audit des actions importantes.
 
-- 💚 [Nuxt 4](https://nuxt.com/) - SSR, ESR, File-based routing, components auto importing, modules, etc.
+## Architecture
 
-- ⚡️ Vite - Instant HMR.
+- Nuxt 4, Vue 3 et TypeScript strict pour l’application SSR ;
+- UnoCSS et variables CSS pour le design system ;
+- Better Auth Vue pour les sessions ;
+- Convex pour les données métier, les requêtes temps réel et l’autorisation ;
+- Pinia réservé aux futurs états locaux d’interface ;
+- Vite PWA pour l’installation et la consultation des pages déjà chargées.
 
-- 🎨 [UnoCSS](https://github.com/unocss/unocss) - The instant on-demand atomic CSS engine.
+Le serveur Nitro rend l’App Shell, l’accueil et l’écran hors ligne. Les routes
+d’authentification et métier (`/login`, `/register`, `/onboarding/**`, `/o/**`)
+sont rendues côté client : elles dépendent du bridge navigateur Better
+Auth–Convex et de ses abonnements temps réel.
 
-- 😃 Use icons from any icon sets in Pure CSS, powered by [UnoCSS](https://github.com/unocss/unocss).
+Chaque fonction Convex vérifie le membership de l’utilisateur dans
+l’organisation ciblée. Les écritures sur les besoins sont réservées aux rôles
+`ORGANIZATION_ADMIN` et `OPERATIONS_MANAGER`.
 
-- 🔥 The `<script setup>` syntax.
+## Prérequis
 
-- 🍍 [State Management via Pinia](https://github.com/vuejs/pinia), see [./app/composables/user.ts](./app/composables/user.ts).
+- Node.js 24 ;
+- pnpm 11.17.0 ;
+- un compte Convex connecté au CLI.
 
-- 📑 [Layout system](./app/layouts).
+## Configuration locale
 
-- 📥 APIs auto importing - for Composition API, VueUse and custom composables.
-
-- 🏎 Zero-config cloud functions and deploy.
-
-- 🦾 TypeScript, of course.
-
-- 📲 [PWA](https://github.com/vite-pwa/nuxt) with offline support and auto-update behavior.
-
-## Plugins
-
-### Nuxt Modules
-
-- [VueUse](https://github.com/vueuse/vueuse) - collection of useful composition APIs.
-- [ColorMode](https://github.com/nuxt-modules/color-mode) - dark and Light mode with auto detection made easy with Nuxt.
-- [UnoCSS](https://github.com/unocss/unocss) - the instant on-demand atomic CSS engine.
-- [Pinia](https://github.com/vuejs/pinia) - intuitive, type safe, light and flexible Store for Vue.
-- [VitePWA](https://github.com/vite-pwa/nuxt) - zero-config PWA Plugin for Nuxt 4.
-- [DevTools](https://github.com/nuxt/devtools) - unleash Nuxt Developer Experience.
-
-## IDE
-
-We recommend using [VS Code](https://code.visualstudio.com/) with [Volar](https://github.com/johnsoncodehk/volar) to get the best experience (You might want to disable [Vetur](https://vuejs.github.io/vetur/) if you have it).
-
-## Variations
-
-- [vitesse](https://github.com/antfu/vitesse) - Opinionated Vite Starter Template
-- [vitesse-lite](https://github.com/antfu/vitesse-lite) - Lightweight version of Vitesse
-- [vitesse-nuxt-bridge](https://github.com/antfu/vitesse-nuxt-bridge) - Vitesse for Nuxt 2 with Bridge
-- [vitesse-webext](https://github.com/antfu/vitesse-webext) - WebExtension Vite starter template
-
-## Local development
+Installez les dépendances :
 
 ```bash
-pnpm install
+pnpm install --frozen-lockfile
+```
+
+Sélectionnez ou créez votre déploiement de développement :
+
+```bash
+pnpm exec convex dev
+```
+
+Le CLI génère `CONVEX_DEPLOYMENT` dans `.env.local`. Ajoutez ensuite les trois
+variables publiques en suivant [`.env.example`](./.env.example) :
+
+```dotenv
+CONVEX_DEPLOYMENT=dev:your-deployment
+NUXT_PUBLIC_CONVEX_URL=https://your-deployment.convex.cloud
+NUXT_PUBLIC_CONVEX_SITE_URL=https://your-deployment.convex.site
+NUXT_PUBLIC_SITE_URL=http://localhost:3000
+```
+
+Les variables privées sont configurées uniquement dans Convex :
+
+```bash
+openssl rand -base64 32 | pnpm exec convex env set BETTER_AUTH_SECRET
+printf 'http://localhost:3000' | pnpm exec convex env set SITE_URL
+```
+
+Ne préfixez jamais ces secrets avec `NUXT_PUBLIC_`.
+
+Le guide d’intégration détaillé est disponible dans
+[`docs/better-auth-setup.md`](./docs/better-auth-setup.md).
+
+## Lancement
+
+Dans un terminal :
+
+```bash
+pnpm exec convex dev
+```
+
+Dans un second terminal :
+
+```bash
 pnpm dev
 ```
+
+L’application est disponible sur <http://localhost:3000>.
+
+Pour tester le service worker en développement :
+
+```bash
+pnpm dev:pwa
+```
+
+## Données de démonstration
+
+Après inscription, utilisez **Charger la démonstration FORUS** sur l’écran de
+création d’organisation. Le bouton n’existe qu’en développement et la mutation
+refuse aussi de s’exécuter lorsque `SITE_URL` ne pointe pas vers localhost.
+
+Le seed crée `FORUS GROUP`, trois clients et huit besoins. Il est idempotent
+pour chaque utilisateur connecté.
+
+## Contrôles qualité
+
+```bash
+pnpm exec convex dev --once
+pnpm lint
+pnpm typecheck
+pnpm test
+pnpm build
+```
+
+Les tests couvrent le calcul de progression, le reste à trouver, les références
+et l’isolement multi-tenant.
+
+## Hors ligne
+
+Le service worker met en cache l’App Shell et les navigations déjà chargées.
+Les mutations métier ne sont pas mises en file dans cette version. Leur future
+frontière d’intégration est définie dans
+[`app/lib/offline-mutation-queue.ts`](./app/lib/offline-mutation-queue.ts).

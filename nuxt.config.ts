@@ -1,5 +1,14 @@
+import { loadEnv } from 'vite'
 import { pwa } from './app/config/pwa'
 import { appDescription } from './app/constants/index'
+
+const localPublicEnv = loadEnv(
+  // eslint-disable-next-line node/prefer-global/process
+  process.env.NODE_ENV ?? 'development',
+  // eslint-disable-next-line node/prefer-global/process
+  process.cwd(),
+  'NUXT_PUBLIC_',
+)
 
 export default defineNuxtConfig({
   modules: [
@@ -11,30 +20,57 @@ export default defineNuxtConfig({
     '@nuxt/eslint',
   ],
 
+  components: [
+    {
+      path: '~/components',
+      pathPrefix: false,
+    },
+  ],
+
   devtools: {
     enabled: true,
   },
 
   app: {
     head: {
+      htmlAttrs: {
+        lang: 'fr',
+      },
       viewport: 'width=device-width,initial-scale=1',
       link: [
         { rel: 'icon', href: '/favicon.ico', sizes: 'any' },
-        { rel: 'icon', type: 'image/svg+xml', href: '/nuxt.svg' },
         { rel: 'apple-touch-icon', href: '/apple-touch-icon.png' },
       ],
       meta: [
         { name: 'viewport', content: 'width=device-width, initial-scale=1' },
         { name: 'description', content: appDescription },
         { name: 'apple-mobile-web-app-status-bar-style', content: 'black-translucent' },
-        { name: 'theme-color', media: '(prefers-color-scheme: light)', content: 'white' },
-        { name: 'theme-color', media: '(prefers-color-scheme: dark)', content: '#222222' },
+        { name: 'theme-color', content: '#07111f' },
       ],
     },
   },
 
+  css: ['~/assets/css/main.css'],
+
   colorMode: {
+    preference: 'dark',
+    fallback: 'dark',
     classSuffix: '',
+  },
+
+  runtimeConfig: {
+    public: {
+      convexUrl: localPublicEnv.NUXT_PUBLIC_CONVEX_URL ?? '',
+      convexSiteUrl: localPublicEnv.NUXT_PUBLIC_CONVEX_SITE_URL ?? '',
+      siteUrl: localPublicEnv.NUXT_PUBLIC_SITE_URL ?? '',
+    },
+  },
+
+  routeRules: {
+    '/login': { ssr: false },
+    '/register': { ssr: false },
+    '/onboarding/**': { ssr: false },
+    '/o/**': { ssr: false },
   },
 
   future: {
@@ -59,8 +95,7 @@ export default defineNuxtConfig({
     },
     prerender: {
       crawlLinks: false,
-      routes: ['/'],
-      ignore: ['/hi'],
+      routes: ['/', '/offline'],
     },
   },
 

@@ -1,32 +1,10 @@
-<script setup lang="ts">
-definePageMeta({
-  layout: 'home',
-})
-
-const online = useOnline()
-</script>
-
 <template>
-  <div>
-    <Logos mb-6 />
-    <ClientOnly>
-      <Suspense>
-        <PageView v-if="online" />
-        <div v-else text-gray:80>
-          You're offline
-        </div>
-        <template #fallback>
-          <div op50 italic>
-            <span animate-pulse>Loading...</span>
-          </div>
-        </template>
-      </Suspense>
-      <template #fallback>
-        <div op50>
-          <span animate-pulse>...</span>
-        </div>
-      </template>
-    </ClientOnly>
-    <InputEntry />
+  <div class="flex min-h-screen items-center justify-center">
+    <div class="text-center">
+      <span class="i-carbon-circle-dash text-3xl text-[var(--color-accent)] inline-block animate-spin" />
+      <p class="text-sm text-[var(--color-text-muted)]">
+        Ouverture de votre espace…
+      </p>
+    </div>
   </div>
 </template>

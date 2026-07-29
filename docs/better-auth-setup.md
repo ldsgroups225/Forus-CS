@@ -1,5 +1,19 @@
 # Convex Better Auth setup
 
+## Current integration status
+
+The Nuxt-to-Convex bridge, backend component registration, schema and HTTP
+routes are implemented. A development deployment must still be selected per
+developer through `pnpm exec convex dev`, because `.env.local` is intentionally
+ignored.
+
+Private deployment variables are never Nuxt variables:
+
+```bash
+openssl rand -base64 32 | pnpm exec convex env set BETTER_AUTH_SECRET
+printf 'http://localhost:3000' | pnpm exec convex env set SITE_URL
+```
+
 This project has the component and its required peers installed:
 
 - `@convex-dev/better-auth@0.12.5`

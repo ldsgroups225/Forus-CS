@@ -12,9 +12,13 @@ export const pwa: ModuleOptions = {
     id: scope,
     scope,
     name: appName,
-    short_name: appName,
+    short_name: 'Forus CS',
     description: appDescription,
-    theme_color: '#ffffff',
+    theme_color: '#07111f',
+    background_color: '#07111f',
+    display: 'standalone',
+    orientation: 'any',
+    lang: 'fr',
     icons: [
       {
         src: 'pwa-192x192.png',
@@ -37,7 +41,7 @@ export const pwa: ModuleOptions = {
   workbox: {
     globPatterns: ['**/*.{js,css,html,txt,png,ico,svg}'],
     navigateFallbackDenylist: [/^\/api\//],
-    navigateFallback: '/',
+    navigateFallback: '/offline',
     cleanupOutdatedCaches: true,
     runtimeCaching: [
       {
@@ -49,6 +53,17 @@ export const pwa: ModuleOptions = {
             maxEntries: 10,
             maxAgeSeconds: 60 * 60 * 24 * 365, // <== 365 days
           },
+          cacheableResponse: {
+            statuses: [0, 200],
+          },
+        },
+      },
+      {
+        urlPattern: ({ request }) => request.mode === 'navigate',
+        handler: 'NetworkFirst',
+        options: {
+          cacheName: 'forus-pages',
+          networkTimeoutSeconds: 3,
           cacheableResponse: {
             statuses: [0, 200],
           },

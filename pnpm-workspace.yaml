@@ -42,6 +42,7 @@ catalogs:
     lint-staged: ^17.2.0
     simple-git-hooks: ^2.13.1
     typescript: ^6.0.3
+    vitest: ^4.1.0
     vue-tsc: ^3.3.8
   frontend:
     '@vueuse/core': ^14.4.0

@@ -125,6 +125,22 @@ export default defineSchema({
     .index('by_organization_user', ['organizationId', 'userId'])
     .index('by_organization_role', ['organizationId', 'role']),
 
+  callingAgents: defineTable({
+    organizationId: v.id('organizations'),
+    name: v.string(),
+    slug: v.string(),
+    color: v.optional(v.string()),
+    linkedUserId: v.optional(v.string()),
+    isActive: v.boolean(),
+    createdAt: v.number(),
+    createdBy: v.string(),
+    updatedAt: v.number(),
+    updatedBy: v.string(),
+  })
+    .index('by_organization', ['organizationId', 'name'])
+    .index('by_organization_slug', ['organizationId', 'slug'])
+    .index('by_organization_linked_user', ['organizationId', 'linkedUserId']),
+
   clients: defineTable({
     organizationId: v.id('organizations'),
     name: v.string(),
@@ -342,7 +358,8 @@ export default defineSchema({
     updatedBy: v.string(),
   })
     .index('by_organization', ['organizationId', 'name'])
-    .index('by_organization_phone', ['organizationId', 'normalizedPhone']),
+    .index('by_organization_phone', ['organizationId', 'normalizedPhone'])
+    .index('by_organization_external', ['organizationId', 'sourceExternalId']),
 
   vehicleDriverAssignments: defineTable({
     organizationId: v.id('organizations'),
@@ -390,12 +407,14 @@ export default defineSchema({
   carrierAssignments: defineTable({
     organizationId: v.id('organizations'),
     carrierId: v.id('carriers'),
-    agentId: v.string(),
+    agentId: v.optional(v.string()),
+    callingAgentId: v.optional(v.id('callingAgents')),
     assignedAt: v.number(),
     assignedBy: v.string(),
   })
     .index('by_organization_carrier', ['organizationId', 'carrierId'])
-    .index('by_organization_agent', ['organizationId', 'agentId']),
+    .index('by_organization_agent', ['organizationId', 'agentId'])
+    .index('by_organization_calling_agent', ['organizationId', 'callingAgentId']),
 
   incidents: defineTable({
     organizationId: v.id('organizations'),

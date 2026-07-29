@@ -20,6 +20,10 @@ const { data: members } = useConvexQuery(api.memberships.list, computed(() =>
   organization.value && canSeeTeam.value
     ? { organizationId: organization.value._id }
     : null))
+const { data: callingAgents } = useConvexQuery(api.callingAgents.list, computed(() =>
+  organization.value && canSeeTeam.value
+    ? { organizationId: organization.value._id }
+    : null))
 const { data: invitations } = useConvexQuery(api.invitations.list, computed(() =>
   organization.value && canAdmin.value
     ? { organizationId: organization.value._id }
@@ -27,6 +31,7 @@ const { data: invitations } = useConvexQuery(api.invitations.list, computed(() =
 const saving = shallowRef(false)
 const feedback = shallowRef('')
 const inviteOpen = shallowRef(false)
+const callingAgentName = shallowRef('')
 const invitationLink = shallowRef('')
 const settingsForm = reactive({
   name: '',
@@ -47,6 +52,15 @@ const supervisorOptions = computed(() => [
   { value: '', label: 'Aucun superviseur' },
   ...(members.value ?? [])
     .filter(member => member.isActive && member.role === 'SUPERVISOR')
+    .map(member => ({
+      value: member.userId,
+      label: member.displayName ?? member.email ?? member.userId,
+    })),
+])
+const agentLinkOptions = computed(() => [
+  { value: '', label: 'Aucun compte lié' },
+  ...(members.value ?? [])
+    .filter(member => member.isActive && member.role === 'AGENT')
     .map(member => ({
       value: member.userId,
       label: member.displayName ?? member.email ?? member.userId,
@@ -159,6 +173,40 @@ async function assignSupervisor(membershipId: Id<'memberships'>, supervisorId?: 
   }
   catch {
     feedback.value = 'Superviseur invalide.'
+  }
+}
+
+async function createCallingAgent() {
+  if (!organization.value || !callingAgentName.value.trim())
+    return
+
+  saving.value = true
+  try {
+    await $convex.mutation(api.callingAgents.create, {
+      organizationId: organization.value._id,
+      name: callingAgentName.value,
+    })
+    callingAgentName.value = ''
+    feedback.value = 'Agent calling créé.'
+  }
+  catch {
+    feedback.value = 'Création de l’agent calling impossible.'
+  }
+  finally {
+    saving.value = false
+  }
+}
+
+async function linkCallingAgent(callingAgentId: Id<'callingAgents'>, userId?: string) {
+  try {
+    await $convex.mutation(api.callingAgents.linkUser, {
+      callingAgentId,
+      userId: userId || undefined,
+    })
+    feedback.value = 'Liaison agent mise à jour.'
+  }
+  catch {
+    feedback.value = 'Liaison impossible : choisissez un membre actif avec le rôle Agent.'
   }
 }
 
@@ -289,6 +337,52 @@ async function revokeInvitation(invitationId: Id<'invitations'>) {
               </tr>
             </tbody>
           </table>
+        </div>
+      </AppCard>
+
+      <AppCard v-if="canSeeTeam">
+        <div class="mb-5 flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
+          <div>
+            <h2 class="text-base font-900 m-0">
+              Agents calling
+            </h2>
+            <p class="text-xs text-[var(--color-text-muted)] m-0 mt-1">
+              Chaque enveloppe porte un portefeuille; un compte réel peut être lié après invitation.
+            </p>
+          </div>
+          <form v-if="canAdmin" class="gap-2 grid sm:grid-cols-[minmax(12rem,18rem)_auto]" @submit.prevent="createCallingAgent">
+            <AppInput v-model="callingAgentName" placeholder="Agent 1" :disabled="saving" />
+            <AppButton type="submit" size="sm" :loading="saving">
+              Créer
+            </AppButton>
+          </form>
+        </div>
+        <p v-if="!callingAgents?.length" class="text-sm text-[var(--color-text-muted)] m-0">
+          Aucun agent calling créé.
+        </p>
+        <div v-else class="gap-3 grid lg:grid-cols-2">
+          <div v-for="agent in callingAgents" :key="agent._id" class="p-3 border border-[var(--color-border)] rounded-xl bg-[var(--color-bg-deep)]">
+            <div class="mb-3 flex gap-3 items-start justify-between">
+              <div>
+                <strong>{{ agent.name }}</strong>
+                <span class="text-xs text-[var(--color-text-muted)] mt-1 block">
+                  {{ agent.assignedCarrierCount }} transporteurs
+                </span>
+              </div>
+              <AppBadge :tone="agent.linkedUserName || agent.linkedUserEmail ? 'success' : 'warning'">
+                {{ agent.linkedUserName || agent.linkedUserEmail ? 'Lié' : 'Enveloppe' }}
+              </AppBadge>
+            </div>
+            <AppSelect
+              v-if="canAdmin"
+              :model-value="agent.linkedUserId || ''"
+              :options="agentLinkOptions"
+              @update:model-value="linkCallingAgent(agent._id, $event)"
+            />
+            <p v-else class="text-xs text-[var(--color-text-muted)] m-0">
+              {{ agent.linkedUserName || agent.linkedUserEmail || 'Compte réel non lié' }}
+            </p>
+          </div>
         </div>
       </AppCard>
 

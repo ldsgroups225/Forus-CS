@@ -10,6 +10,7 @@
 
 import type * as auditLogs from "../auditLogs.js";
 import type * as auth from "../auth.js";
+import type * as callingAgents from "../callingAgents.js";
 import type * as calls from "../calls.js";
 import type * as carrierAssets from "../carrierAssets.js";
 import type * as carrierOptions from "../carrierOptions.js";
@@ -48,6 +49,7 @@ import type {
 declare const fullApi: ApiFromModules<{
   auditLogs: typeof auditLogs;
   auth: typeof auth;
+  callingAgents: typeof callingAgents;
   calls: typeof calls;
   carrierAssets: typeof carrierAssets;
   carrierOptions: typeof carrierOptions;

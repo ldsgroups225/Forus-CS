@@ -39,6 +39,8 @@ export const pwa: ModuleOptions = {
     ],
   },
   workbox: {
+    skipWaiting: true,
+    clientsClaim: true,
     globPatterns: ['**/*.{js,css,html,txt,png,ico,svg}'],
     navigateFallbackDenylist: [/^\/api\//],
     navigateFallback: '/offline',

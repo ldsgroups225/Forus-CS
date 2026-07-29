@@ -3,6 +3,7 @@ import json
 import math
 import os
 import subprocess
+import time
 from pathlib import Path
 
 import pandas as pd
@@ -24,6 +25,10 @@ def number(value):
         return parsed if math.isfinite(parsed) else 0
     except ValueError:
         return 0
+
+
+def normalized_registration(value):
+    return "".join(char for char in text(value).upper() if char.isalnum())
 
 
 def timestamp(value):
@@ -50,7 +55,8 @@ def source_portfolios(path):
     return result
 
 
-def build_payloads(path, limit):
+def build_payloads(path, limit, agent_map=None):
+    agent_map = agent_map or {}
     portfolio_by_phone = source_portfolios(path)
     vehicle_rows = read_rows(path, "Véhicules détaillés")
     owner_id_by_phone = {
@@ -83,13 +89,22 @@ def build_payloads(path, limit):
     if limit:
         carriers = carriers[:limit]
     allowed_phones = {row["phone"] for row in carriers}
+    source_vehicle_count = sum(1 for row in vehicle_rows if text(row.get("Immatriculation")))
 
     vehicles = []
     driver_context = {}
+    skipped_without_imported_carrier = 0
+    skipped_invalid_registration = 0
     for row in vehicle_rows:
         carrier_phone = text(row.get("Contact propriétaire"))
         registration = text(row.get("Immatriculation"))
-        if carrier_phone not in allowed_phones or not registration:
+        if not registration:
+            continue
+        if carrier_phone not in allowed_phones:
+            skipped_without_imported_carrier += 1
+            continue
+        if len(normalized_registration(registration)) < 3:
+            skipped_invalid_registration += 1
             continue
         vehicles.append({
             "registration": registration,
@@ -139,34 +154,63 @@ def build_payloads(path, limit):
             driver["licenseExpiresAt"] = expires_at
         drivers.append(driver)
 
-    return carriers, vehicles, drivers
+    assignments = []
+    for phone, source_portfolio in portfolio_by_phone.items():
+        if phone not in allowed_phones:
+            continue
+        agent_ref = text(agent_map.get(source_portfolio))
+        assignment = {
+            "carrierPhone": phone,
+            "sourcePortfolio": source_portfolio,
+        }
+        key = "agentEmail" if "@" in agent_ref else "agentId"
+        if agent_ref:
+            assignment[key] = agent_ref.strip().lower() if key == "agentEmail" else agent_ref.strip()
+        assignments.append(assignment)
+
+    diagnostics = {
+        "sourceVehicles": source_vehicle_count,
+        "skippedVehiclesWithoutImportedCarrier": skipped_without_imported_carrier,
+        "skippedVehiclesInvalidRegistration": skipped_invalid_registration,
+    }
+
+    return carriers, vehicles, drivers, assignments, diagnostics
 
 
-def send_batches(function_name, organization_slug, import_key, rows, batch_size):
-    totals = {"created": 0, "updated": 0}
+def send_batches(function_name, organization_slug, import_key, rows, batch_size, retries=4):
+    totals = {"created": 0, "updated": 0, "skipped": 0}
     for offset in range(0, len(rows), batch_size):
         payload = json.dumps({
             "organizationSlug": organization_slug,
             "importKey": import_key,
             "rows": rows[offset:offset + batch_size],
         }, ensure_ascii=False, separators=(",", ":"))
-        result = subprocess.run(
-            ["pnpm", "exec", "convex", "run", function_name, payload],
-            check=False,
-            capture_output=True,
-            text=True,
-        )
-        if result.returncode != 0:
+        result = None
+        for attempt in range(1, retries + 1):
+            result = subprocess.run(
+                ["pnpm", "exec", "convex", "run", function_name, payload],
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+            if result.returncode == 0:
+                break
+            if attempt < retries and "fetch failed" in result.stderr:
+                time.sleep(attempt * 2)
+                continue
             safe_error = result.stderr.replace(import_key, "[secret masqué]").strip()
             raise RuntimeError(f"{function_name} a échoué : {safe_error}")
+        if result is None:
+            raise RuntimeError(f"{function_name} n'a pas été exécuté.")
         try:
             response = json.loads(result.stdout)
         except json.JSONDecodeError as error:
             raise RuntimeError(
                 f"{function_name} a retourné une réponse invalide."
             ) from error
-        totals["created"] += response["created"]
-        totals["updated"] += response["updated"]
+        totals["created"] += response.get("created", 0)
+        totals["updated"] += response.get("updated", 0)
+        totals["skipped"] += response.get("skipped", 0)
     return totals
 
 
@@ -178,15 +222,37 @@ def main():
     parser.add_argument("--all", action="store_true")
     parser.add_argument("--batch-size", type=int, default=20)
     parser.add_argument("--dry-run", action="store_true")
+    parser.add_argument(
+        "--stage",
+        choices=("all", "carriers", "vehicles", "drivers", "assignments"),
+        default="all",
+    )
+    parser.add_argument(
+        "--agent-map-json",
+        default=os.environ.get("FORUS_AGENT_MAP_JSON", "{}"),
+        help="Mapping JSON optionnel: {\"Agent 1\":\"agent1@forus.ci\"}.",
+    )
     args = parser.parse_args()
     if not args.workbook.is_file():
         raise SystemExit("Classeur introuvable.")
+    try:
+        agent_map = json.loads(args.agent_map_json)
+    except json.JSONDecodeError as error:
+        raise SystemExit("FORUS_AGENT_MAP_JSON doit être un objet JSON valide.") from error
+    if not isinstance(agent_map, dict) or any(
+        not isinstance(key, str) or not isinstance(value, str)
+        for key, value in agent_map.items()
+    ):
+        raise SystemExit("FORUS_AGENT_MAP_JSON doit mapper des libellés Agent vers e-mails ou userId.")
+
     limit = None if args.all else max(1, args.limit)
-    carriers, vehicles, drivers = build_payloads(args.workbook, limit)
+    carriers, vehicles, drivers, assignments, diagnostics = build_payloads(args.workbook, limit, agent_map)
     summary = {
         "carriers": len(carriers),
         "vehicles": len(vehicles),
         "drivers": len(drivers),
+        "assignments": len(assignments),
+        **diagnostics,
         "mode": "dry-run" if args.dry_run else "import",
     }
     if not args.dry_run:
@@ -195,27 +261,38 @@ def main():
             raise SystemExit(
                 "FORUS_FLEET_IMPORT_KEY est requis pour un import effectif."
             )
-        summary["carrierResult"] = send_batches(
-            "fleetImport:upsertCarriers",
-            args.organization,
-            import_key,
-            carriers,
-            args.batch_size,
-        )
-        summary["vehicleResult"] = send_batches(
-            "fleetImport:upsertVehicles",
-            args.organization,
-            import_key,
-            vehicles,
-            args.batch_size,
-        )
-        summary["driverResult"] = send_batches(
-            "fleetImport:upsertDrivers",
-            args.organization,
-            import_key,
-            drivers,
-            args.batch_size,
-        )
+        if args.stage in ("all", "carriers"):
+            summary["carrierResult"] = send_batches(
+                "fleetImport:upsertCarriers",
+                args.organization,
+                import_key,
+                carriers,
+                args.batch_size,
+            )
+        if args.stage in ("all", "vehicles"):
+            summary["vehicleResult"] = send_batches(
+                "fleetImport:upsertVehicles",
+                args.organization,
+                import_key,
+                vehicles,
+                args.batch_size,
+            )
+        if args.stage in ("all", "drivers"):
+            summary["driverResult"] = send_batches(
+                "fleetImport:upsertDrivers",
+                args.organization,
+                import_key,
+                drivers,
+                args.batch_size,
+            )
+        if args.stage in ("all", "assignments") and assignments:
+            summary["assignmentResult"] = send_batches(
+                "fleetImport:upsertAssignments",
+                args.organization,
+                import_key,
+                assignments,
+                args.batch_size,
+            )
     print(json.dumps(summary, ensure_ascii=False))
 
 

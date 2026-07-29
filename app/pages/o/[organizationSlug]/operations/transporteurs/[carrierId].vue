@@ -29,14 +29,11 @@ const { data: needs } = useConvexQuery(api.needs.listActive, organizationArgs)
 const { data: calls } = useConvexQuery(api.calls.listRecent, computed(() =>
   organization.value ? { organizationId: organization.value._id, limit: 100 } : null))
 const { data: followUps } = useConvexQuery(api.calls.listFollowUps, organizationArgs)
+const { data: callingAgents } = useConvexQuery(api.callingAgents.list, organizationArgs)
 const canManageTeam = computed(() =>
   organization.value?.role === 'ORGANIZATION_ADMIN'
   || organization.value?.role === 'OPERATIONS_MANAGER'
   || organization.value?.role === 'SUPERVISOR')
-const { data: members } = useConvexQuery(api.memberships.list, computed(() =>
-  organization.value && canManageTeam.value
-    ? { organizationId: organization.value._id }
-    : null))
 
 const action = shallowRef<Action>(null)
 const modalOpen = computed({
@@ -85,7 +82,7 @@ const callForm = reactive({
   notes: '',
   followUpAt: '',
 })
-const assignmentAgentId = shallowRef('')
+const assignmentCallingAgentId = shallowRef('')
 
 const modalTitle = computed(() => ({
   edit: 'Modifier le transporteur',
@@ -109,12 +106,12 @@ const needOptions = computed(() => [
     label: `${need.reference} · ${need.destination}`,
   })),
 ])
-const agentOptions = computed(() =>
-  (members.value ?? [])
-    .filter(member => member.isActive && member.role === 'AGENT')
-    .map(member => ({
-      value: member.userId,
-      label: member.displayName ?? member.email ?? member.userId,
+const callingAgentOptions = computed(() =>
+  (callingAgents.value ?? [])
+    .filter(agent => agent.isActive)
+    .map(agent => ({
+      value: agent._id,
+      label: agent.name,
     })))
 const carrierCalls = computed(() =>
   (calls.value ?? []).filter(call => call.carrierId === carrierId.value))
@@ -140,6 +137,11 @@ function openEdit() {
     notes: carrier.value.notes ?? '',
   })
   action.value = 'edit'
+}
+
+function openAssignment() {
+  assignmentCallingAgentId.value = carrier.value?.assignedCallingAgentId ?? ''
+  action.value = 'assign'
 }
 
 async function submitAction() {
@@ -231,10 +233,10 @@ async function submitAction() {
       }
     }
     else if (action.value === 'assign') {
-      if (assignmentAgentId.value) {
-        await $convex.mutation(api.portfolios.assign, {
+      if (assignmentCallingAgentId.value) {
+        await $convex.mutation(api.portfolios.assignToCallingAgent, {
           carrierId: carrierId.value,
-          agentId: assignmentAgentId.value,
+          callingAgentId: assignmentCallingAgentId.value as Id<'callingAgents'>,
         })
       }
       else {
@@ -302,7 +304,7 @@ async function completeFollowUp(followUpId: Id<'followUps'>) {
             </template>
             Journaliser un appel
           </AppButton>
-          <AppButton v-if="canManageTeam" variant="secondary" @click="action = 'assign'">
+          <AppButton v-if="canManageTeam" variant="secondary" @click="openAssignment">
             Portefeuille
           </AppButton>
         </div>
@@ -347,7 +349,7 @@ async function completeFollowUp(followUpId: Id<'followUps'>) {
                 <dt class="text-xs text-[var(--color-text-subtle)]">
                   Portefeuille
                 </dt><dd class="text-sm font-700 m-0 mt-1">
-                  {{ carrier.assignedAgentId || carrier.sourcePortfolio || 'Non attribué' }}
+                  {{ carrier.assignedCallingAgentName || carrier.sourcePortfolio || carrier.assignedAgentId || 'Non attribué' }}
                 </dd>
               </div>
               <div>
@@ -602,11 +604,11 @@ async function completeFollowUp(followUpId: Id<'followUps'>) {
             </AppFormField>
           </template>
           <template v-else-if="action === 'assign'">
-            <AppFormField label="Agent responsable" for="assignment-agent" hint="Laissez vide pour retirer l’attribution.">
-              <AppSelect id="assignment-agent" v-model="assignmentAgentId" :options="[{ value: '', label: 'Non attribué' }, ...agentOptions]" />
+            <AppFormField label="Portefeuille calling" for="assignment-agent" hint="Laissez vide pour retirer l’attribution.">
+              <AppSelect id="assignment-agent" v-model="assignmentCallingAgentId" :options="[{ value: '', label: 'Non attribué' }, ...callingAgentOptions]" />
             </AppFormField>
             <p class="text-xs text-[var(--color-text-muted)]">
-              Un transporteur ne peut appartenir qu’à un seul portefeuille. La capacité maximale est de 100 transporteurs par agent.
+              Un transporteur ne peut appartenir qu’à un seul portefeuille. Le compte réel lié à cette enveloppe héritera de l’accès.
             </p>
           </template>
           <div class="pt-2 flex gap-2 justify-end">

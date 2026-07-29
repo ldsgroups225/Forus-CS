@@ -1,5 +1,6 @@
 // @ts-check
 import antfu from '@antfu/eslint-config'
+import nuxt from './.nuxt/eslint.config.mjs'
 
 export default antfu(
   {
@@ -7,10 +8,5 @@ export default antfu(
     formatters: true,
     pnpm: true,
   },
-  {
-    files: ['README.md', 'README.zh-CN.md'],
-    rules: {
-      'markdown/heading-increment': 'off',
-    },
-  },
 )
+  .append(nuxt())

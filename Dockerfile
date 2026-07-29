@@ -1,4 +1,4 @@
-FROM node:20-alpine AS build-stage
+FROM node:24-alpine AS build-stage
 
 WORKDIR /app
 RUN corepack enable
@@ -10,9 +10,13 @@ RUN --mount=type=cache,id=pnpm-store,target=/root/.pnpm-store \
 COPY . .
 RUN pnpm build
 
-FROM nginx:stable-alpine AS production-stage
+# SSR
+FROM node:24-alpine AS production-stage
 
-COPY --from=build-stage /app/dist /usr/share/nginx/html
-EXPOSE 80
+WORKDIR /app
 
-CMD ["nginx", "-g", "daemon off;"]
+COPY --from=build-stage /app/.output ./.output
+
+EXPOSE 3000
+
+CMD ["node", ".output/server/index.mjs"]

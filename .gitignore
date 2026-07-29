@@ -12,3 +12,4 @@ public/assets/fonts
 .env.local
 test-results
 playwright-report
+.vercel

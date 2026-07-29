@@ -10,6 +10,15 @@ const localPublicEnv = loadEnv(
   'NUXT_PUBLIC_',
 )
 
+const publicEnv = {
+  // eslint-disable-next-line node/prefer-global/process
+  convexUrl: process.env.NUXT_PUBLIC_CONVEX_URL ?? localPublicEnv.NUXT_PUBLIC_CONVEX_URL ?? '',
+  // eslint-disable-next-line node/prefer-global/process
+  convexSiteUrl: process.env.NUXT_PUBLIC_CONVEX_SITE_URL ?? localPublicEnv.NUXT_PUBLIC_CONVEX_SITE_URL ?? '',
+  // eslint-disable-next-line node/prefer-global/process
+  siteUrl: process.env.NUXT_PUBLIC_SITE_URL ?? localPublicEnv.NUXT_PUBLIC_SITE_URL ?? '',
+}
+
 export default defineNuxtConfig({
   modules: [
     '@vueuse/nuxt',
@@ -59,11 +68,7 @@ export default defineNuxtConfig({
   },
 
   runtimeConfig: {
-    public: {
-      convexUrl: localPublicEnv.NUXT_PUBLIC_CONVEX_URL ?? '',
-      convexSiteUrl: localPublicEnv.NUXT_PUBLIC_CONVEX_SITE_URL ?? '',
-      siteUrl: localPublicEnv.NUXT_PUBLIC_SITE_URL ?? '',
-    },
+    public: publicEnv,
   },
 
   routeRules: {

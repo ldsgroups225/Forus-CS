@@ -10,11 +10,14 @@
 
 import type * as auditLogs from "../auditLogs.js";
 import type * as auth from "../auth.js";
+import type * as carrierOptions from "../carrierOptions.js";
 import type * as clients from "../clients.js";
 import type * as http from "../http.js";
 import type * as lib_audit from "../lib/audit.js";
 import type * as lib_authz from "../lib/authz.js";
 import type * as lib_needs from "../lib/needs.js";
+import type * as lib_workflow from "../lib/workflow.js";
+import type * as missions from "../missions.js";
 import type * as needs from "../needs.js";
 import type * as organizations from "../organizations.js";
 import type * as seed from "../seed.js";
@@ -28,11 +31,14 @@ import type {
 declare const fullApi: ApiFromModules<{
   auditLogs: typeof auditLogs;
   auth: typeof auth;
+  carrierOptions: typeof carrierOptions;
   clients: typeof clients;
   http: typeof http;
   "lib/audit": typeof lib_audit;
   "lib/authz": typeof lib_authz;
   "lib/needs": typeof lib_needs;
+  "lib/workflow": typeof lib_workflow;
+  missions: typeof missions;
   needs: typeof needs;
   organizations: typeof organizations;
   seed: typeof seed;

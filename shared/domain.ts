@@ -20,9 +20,22 @@ export const needUrgencies = [
   'CRITICAL',
 ] as const
 
+export const carrierOptionStatuses = [
+  'PENDING',
+  'NEGOTIATION',
+  'ACCEPTED',
+  'REFUSED',
+] as const
+
+export const missionStatuses = [
+  'CONFIRMED',
+] as const
+
 export type OrganizationRole = typeof organizationRoles[number]
 export type NeedStatus = typeof needStatuses[number]
 export type NeedUrgency = typeof needUrgencies[number]
+export type CarrierOptionStatus = typeof carrierOptionStatuses[number]
+export type MissionStatus = typeof missionStatuses[number]
 
 export const roleLabels: Record<OrganizationRole, string> = {
   ORGANIZATION_ADMIN: 'Administrateur',
@@ -44,6 +57,45 @@ export const needUrgencyLabels: Record<NeedUrgency, string> = {
   MEDIUM: 'Moyenne',
   HIGH: 'Haute',
   CRITICAL: 'Critique',
+}
+
+export const carrierOptionStatusLabels: Record<CarrierOptionStatus, string> = {
+  PENDING: 'À décider',
+  NEGOTIATION: 'À négocier',
+  ACCEPTED: 'Acceptée',
+  REFUSED: 'Refusée',
+}
+
+export const missionStatusLabels: Record<MissionStatus, string> = {
+  CONFIRMED: 'Confirmée',
+}
+
+export interface CarrierOptionFormValues {
+  carrierName: string
+  carrierPhone: string
+  carrierEmail: string
+  truckType: string
+  proposedTruckCount: number
+  pricePerTruck: number
+  availableAt: string
+  paymentTerms: string
+  documentsConfirmed: boolean
+  notes: string
+}
+
+export function createEmptyCarrierOptionForm(truckType = ''): CarrierOptionFormValues {
+  return {
+    carrierName: '',
+    carrierPhone: '',
+    carrierEmail: '',
+    truckType,
+    proposedTruckCount: 1,
+    pricePerTruck: 0,
+    availableAt: '',
+    paymentTerms: '',
+    documentsConfirmed: false,
+    notes: '',
+  }
 }
 
 export interface NeedFormValues {

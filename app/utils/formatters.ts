@@ -1,4 +1,4 @@
-import type { NeedStatus, NeedUrgency } from '~~/shared/domain'
+import type { CarrierOptionStatus, MissionStatus, NeedStatus, NeedUrgency } from '~~/shared/domain'
 
 const nonDigitPattern = /\D/g
 const ciPhonePattern = /^(\d{2})(\d{2})(\d{2})(\d{2})(\d{2})$/
@@ -81,4 +81,19 @@ export function needUrgencyTone(urgency: NeedUrgency) {
     HIGH: 'warning',
     CRITICAL: 'danger',
   }[urgency] as 'neutral' | 'info' | 'warning' | 'danger'
+}
+
+export function carrierOptionStatusTone(status: CarrierOptionStatus) {
+  return {
+    PENDING: 'warning',
+    NEGOTIATION: 'info',
+    ACCEPTED: 'success',
+    REFUSED: 'danger',
+  }[status] as 'warning' | 'info' | 'success' | 'danger'
+}
+
+export function missionStatusTone(status: MissionStatus) {
+  return {
+    CONFIRMED: 'success',
+  }[status] as 'success'
 }

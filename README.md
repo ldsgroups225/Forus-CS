@@ -9,7 +9,9 @@ La première verticale fonctionnelle couvre :
 3. création d’un besoin en brouillon ;
 4. publication et liste des besoins actifs ;
 5. consultation, modification et annulation ;
-6. audit des actions importantes.
+6. soumission, négociation, acceptation ou refus d’une option transporteur ;
+7. création atomique d’une mission et mise à jour des camions approuvés ;
+8. audit des actions importantes.
 
 ## Architecture
 
@@ -26,8 +28,10 @@ sont rendues côté client : elles dépendent du bridge navigateur Better
 Auth–Convex et de ses abonnements temps réel.
 
 Chaque fonction Convex vérifie le membership de l’utilisateur dans
-l’organisation ciblée. Les écritures sur les besoins sont réservées aux rôles
-`ORGANIZATION_ADMIN` et `OPERATIONS_MANAGER`.
+l’organisation ciblée. Les écritures sur les besoins et les décisions d’option
+sont réservées aux rôles `ORGANIZATION_ADMIN` et `OPERATIONS_MANAGER`. Tous les
+membres actifs peuvent soumettre une option ; chaque acceptation crée une seule
+mission et met à jour la progression du besoin dans la même transaction Convex.
 
 ## Prérequis
 
@@ -112,8 +116,8 @@ pnpm test
 pnpm build
 ```
 
-Les tests couvrent le calcul de progression, le reste à trouver, les références
-et l’isolement multi-tenant.
+Les tests couvrent le calcul de progression, le reste à trouver, les références,
+l’acceptation partielle ou complète d’une option et l’isolement multi-tenant.
 
 ## Hors ligne
 

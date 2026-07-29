@@ -23,6 +23,22 @@ const needStatus = v.union(
   v.literal('CANCELLED'),
 )
 
+const carrierOptionStatus = v.union(
+  v.literal('PENDING'),
+  v.literal('NEGOTIATION'),
+  v.literal('ACCEPTED'),
+  v.literal('REFUSED'),
+)
+
+const missionStatus = v.union(
+  v.literal('CONFIRMED'),
+)
+
+const workflowCounterKind = v.union(
+  v.literal('OPTION'),
+  v.literal('MISSION'),
+)
+
 export default defineSchema({
   organizations: defineTable({
     name: v.string(),
@@ -96,6 +112,61 @@ export default defineSchema({
     .index('by_organization_reference', ['organizationId', 'reference'])
     .index('by_organization_updated', ['organizationId', 'lastUpdatedAt']),
 
+  carrierOptions: defineTable({
+    organizationId: v.id('organizations'),
+    needId: v.id('needs'),
+    reference: v.string(),
+    carrierName: v.string(),
+    carrierPhone: v.optional(v.string()),
+    carrierEmail: v.optional(v.string()),
+    truckType: v.string(),
+    proposedTruckCount: v.number(),
+    acceptedTruckCount: v.optional(v.number()),
+    pricePerTruck: v.number(),
+    availableAt: v.number(),
+    paymentTerms: v.optional(v.string()),
+    documentsConfirmed: v.boolean(),
+    notes: v.optional(v.string()),
+    decisionNote: v.optional(v.string()),
+    status: carrierOptionStatus,
+    decidedAt: v.optional(v.number()),
+    decidedBy: v.optional(v.string()),
+    createdAt: v.number(),
+    createdBy: v.string(),
+    updatedAt: v.number(),
+    updatedBy: v.string(),
+  })
+    .index('by_organization', ['organizationId'])
+    .index('by_organization_status', ['organizationId', 'status'])
+    .index('by_organization_reference', ['organizationId', 'reference'])
+    .index('by_need', ['needId'])
+    .index('by_need_status', ['needId', 'status']),
+
+  missions: defineTable({
+    organizationId: v.id('organizations'),
+    needId: v.id('needs'),
+    optionId: v.id('carrierOptions'),
+    reference: v.string(),
+    carrierName: v.string(),
+    carrierPhone: v.optional(v.string()),
+    truckType: v.string(),
+    truckCount: v.number(),
+    pricePerTruck: v.number(),
+    totalPrice: v.number(),
+    loadingLocation: v.string(),
+    destination: v.string(),
+    mobilizationAt: v.number(),
+    status: missionStatus,
+    createdAt: v.number(),
+    createdBy: v.string(),
+    lastUpdatedAt: v.number(),
+  })
+    .index('by_organization', ['organizationId'])
+    .index('by_organization_status', ['organizationId', 'status'])
+    .index('by_organization_reference', ['organizationId', 'reference'])
+    .index('by_need', ['needId'])
+    .index('by_option', ['optionId']),
+
   auditLogs: defineTable({
     organizationId: v.id('organizations'),
     actorId: v.string(),
@@ -115,6 +186,14 @@ export default defineSchema({
     sequence: v.number(),
   })
     .index('by_organization_date', ['organizationId', 'dateKey']),
+
+  workflowCounters: defineTable({
+    organizationId: v.id('organizations'),
+    kind: workflowCounterKind,
+    dateKey: v.string(),
+    sequence: v.number(),
+  })
+    .index('by_organization_kind_date', ['organizationId', 'kind', 'dateKey']),
 
   developmentSeeds: defineTable({
     organizationId: v.id('organizations'),

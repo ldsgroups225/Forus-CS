@@ -1,7 +1,7 @@
 <script setup lang="ts">
-import type { NeedFormValues } from '~~/shared/domain'
+import type { CarrierOptionFormValues, NeedFormValues } from '~~/shared/domain'
 import type { Id } from '../../../../../../convex/_generated/dataModel'
-import { needStatusLabels, needUrgencyLabels } from '~~/shared/domain'
+import { carrierOptionStatusLabels, needStatusLabels, needUrgencyLabels } from '~~/shared/domain'
 import { api } from '../../../../../../convex/_generated/api'
 
 definePageMeta({ layout: 'operations' })
@@ -26,9 +26,12 @@ const auditArgs = computed(() => organization.value && need.value
   : null,
 )
 const { data: auditLogs } = useConvexQuery(api.auditLogs.listForEntity, auditArgs)
+const optionArgs = computed(() => need.value ? { needId: need.value._id } : null)
+const { data: carrierOptions } = useConvexQuery(api.carrierOptions.listForNeed, optionArgs)
 
 const editOpen = ref(false)
 const cancelOpen = ref(false)
+const optionOpen = ref(false)
 const loadingAction = ref(false)
 const actionError = ref('')
 
@@ -135,12 +138,45 @@ async function cancelNeed() {
   }
 }
 
+async function submitCarrierOption(values: CarrierOptionFormValues) {
+  if (!organization.value || !need.value)
+    return
+
+  loadingAction.value = true
+  actionError.value = ''
+  try {
+    await $convex.mutation(api.carrierOptions.create, {
+      organizationId: organization.value._id,
+      needId: need.value._id,
+      carrierName: values.carrierName,
+      carrierPhone: values.carrierPhone || undefined,
+      carrierEmail: values.carrierEmail || undefined,
+      truckType: values.truckType,
+      proposedTruckCount: values.proposedTruckCount,
+      pricePerTruck: values.pricePerTruck,
+      availableAt: new Date(values.availableAt).getTime(),
+      paymentTerms: values.paymentTerms || undefined,
+      documentsConfirmed: values.documentsConfirmed,
+      notes: values.notes || undefined,
+    })
+    optionOpen.value = false
+  }
+  catch {
+    actionError.value = 'Option impossible à soumettre. Vérifiez la quantité restante et les informations du transporteur.'
+  }
+  finally {
+    loadingAction.value = false
+  }
+}
+
 function auditLabel(action: string) {
   return {
     CREATE_DRAFT: 'Brouillon créé',
     UPDATE: 'Besoin modifié',
     PUBLISH: 'Besoin publié',
     CANCEL: 'Besoin annulé',
+    OPTION_SUBMITTED: 'Option transporteur soumise',
+    OPTION_ACCEPTED: 'Option acceptée et progression mise à jour',
     DEVELOPMENT_SEED: 'Donnée de démonstration créée',
   }[action] ?? action
 }
@@ -301,6 +337,69 @@ function auditLabel(action: string) {
                   <strong class="text-xl text-orange-300 block">{{ need.remainingTruckCount }}</strong><span class="text-[10px] text-[var(--color-text-subtle)]">Reste</span>
                 </div>
               </div>
+            </div>
+          </AppCard>
+
+          <AppCard>
+            <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+              <div>
+                <h2 class="text-base font-800 m-0">
+                  Options transporteurs
+                </h2>
+                <p class="text-xs text-[var(--color-text-muted)] mb-0 mt-1">
+                  {{ carrierOptions?.length ?? 0 }} proposition(s) enregistrée(s) pour ce besoin.
+                </p>
+              </div>
+              <AppButton
+                v-if="need.status === 'OPEN' || need.status === 'PARTIAL'"
+                size="sm"
+                @click="optionOpen = true"
+              >
+                <template #leading>
+                  <span class="i-carbon-add" />
+                </template>
+                Ajouter une option
+              </AppButton>
+            </div>
+
+            <div v-if="carrierOptions?.length" class="mt-4 space-y-2">
+              <NuxtLink
+                v-for="option in carrierOptions"
+                :key="option._id"
+                :to="`/o/${organization?.slug}/operations/options/${option._id}`"
+                class="p-3 border border-[var(--color-border)] rounded-xl bg-[var(--color-bg-deep)] flex flex-col gap-3 transition hover:border-[var(--color-border-strong)] sm:flex-row sm:items-center sm:justify-between"
+              >
+                <div>
+                  <strong class="text-sm">{{ option.reference }} · {{ option.carrierName }}</strong>
+                  <span class="text-xs text-[var(--color-text-muted)] mt-1 block">
+                    {{ option.proposedTruckCount }} camion(s) · {{ formatCurrency(option.pricePerTruck) }} / camion
+                  </span>
+                </div>
+                <AppBadge :tone="carrierOptionStatusTone(option.status)">
+                  {{ carrierOptionStatusLabels[option.status] }}
+                </AppBadge>
+              </NuxtLink>
+            </div>
+            <p v-else class="text-sm text-[var(--color-text-muted)] mb-0 mt-4">
+              Aucune proposition transporteur pour le moment.
+            </p>
+
+            <div v-if="optionOpen" class="mt-5 pt-5 border-t border-[var(--color-border)]">
+              <div class="mb-5">
+                <h3 class="text-sm font-800 m-0">
+                  Nouvelle option transporteur
+                </h3>
+                <p class="text-xs text-[var(--color-text-muted)] mb-0 mt-1">
+                  La proposition restera à décider avant toute création de mission.
+                </p>
+              </div>
+              <CarrierOptionForm
+                :truck-type="need.truckType"
+                :maximum-truck-count="need.remainingTruckCount"
+                :loading="loadingAction"
+                @submit="submitCarrierOption"
+                @cancel="optionOpen = false"
+              />
             </div>
           </AppCard>
 

@@ -9,8 +9,8 @@ const items = computed(() => [
   { label: 'Accueil', icon: 'i-carbon-home', to: base.value },
   { label: 'Besoins', icon: 'i-carbon-task', to: `${base.value}/needs` },
   { label: 'Créer', icon: 'i-carbon-add', to: `${base.value}/needs/new`, cta: true },
-  { label: 'Clients', icon: 'i-carbon-enterprise', to: `${base.value}/clients` },
-  { label: 'Plus', icon: 'i-carbon-overflow-menu-horizontal', to: `${base.value}/parametres` },
+  { label: 'Options', icon: 'i-carbon-list-checked', to: `${base.value}/options` },
+  { label: 'Missions', icon: 'i-carbon-delivery', to: `${base.value}/missions` },
 ])
 </script>
 

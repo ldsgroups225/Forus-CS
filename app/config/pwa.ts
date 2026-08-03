@@ -65,7 +65,7 @@ export const pwa: ModuleOptions = {
         handler: 'NetworkFirst',
         options: {
           cacheName: 'forus-pages',
-          networkTimeoutSeconds: 3,
+          networkTimeoutSeconds: 10,
           cacheableResponse: {
             statuses: [0, 200],
           },

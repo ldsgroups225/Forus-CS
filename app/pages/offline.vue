@@ -1,10 +1,20 @@
 <script setup lang="ts">
+const route = useRoute()
 const online = useOnline()
 
-watch(online, (value) => {
-  if (value)
-    void navigateTo('/')
+const recoveryPath = computed(() => {
+  const redirect = typeof route.query.redirect === 'string' ? route.query.redirect : ''
+  return redirect.startsWith('/') && !redirect.startsWith('//') && redirect !== '/offline'
+    ? redirect
+    : '/'
 })
+
+if (import.meta.client) {
+  watch(online, (value) => {
+    if (value)
+      void navigateTo(recoveryPath.value)
+  }, { immediate: true })
+}
 </script>
 
 <template>

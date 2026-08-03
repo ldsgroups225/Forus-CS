@@ -27,7 +27,7 @@ export default defineNuxtRouteMiddleware(async (to) => {
     if (isPublic)
       return
 
-    return navigateTo('/offline')
+    return navigateTo({ path: '/offline', query: { redirect: to.fullPath } })
   }
 
   const isAuthenticated = Boolean(response.data?.user)

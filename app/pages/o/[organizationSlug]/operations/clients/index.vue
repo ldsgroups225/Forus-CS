@@ -119,25 +119,16 @@ async function toggleClient(client: NonNullable<typeof clients.value>[number]) {
 
 <template>
   <div class="page-container">
-    <div class="mb-6 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
-      <div>
-        <p class="text-xs text-[var(--color-accent)] tracking-[0.16em] font-800 mb-1 uppercase">
-          Référentiel commercial
-        </p>
-        <h1 class="text-2xl font-900 m-0 sm:text-3xl">
-          Clients
-        </h1>
-        <p class="text-sm text-[var(--color-text-muted)] mb-0 mt-2">
-          Coordonnées, activation et historique des donneurs d’ordre.
-        </p>
-      </div>
-      <AppButton @click="createClient">
-        <template #leading>
-          <span class="i-carbon-add" />
-        </template>
-        Nouveau client
-      </AppButton>
-    </div>
+    <AppPageHeader title="Clients" description="Coordonnées, activation et historique des donneurs d’ordre.">
+      <template #actions>
+        <AppButton @click="createClient">
+          <template #leading>
+            <span class="i-carbon-add" />
+          </template>
+          Nouveau client
+        </AppButton>
+      </template>
+    </AppPageHeader>
 
     <p v-if="feedback" class="text-sm mb-4 px-4 py-3 border border-[var(--color-border)] rounded-xl bg-[var(--color-surface)]" role="status">
       {{ feedback }}

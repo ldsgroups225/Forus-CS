@@ -42,6 +42,7 @@ const settingsForm = reactive({
   currency: 'XOF',
   defaultCountryCode: '225',
   whatsappBusinessEnabled: false,
+  presenceEnabled: false,
   agentBaseStipend: 50_000,
   maximumPerformanceBonus: 50_000,
 })
@@ -106,6 +107,7 @@ watch(
       currency: currentSettings.currency,
       defaultCountryCode: currentSettings.defaultCountryCode,
       whatsappBusinessEnabled: currentSettings.whatsappBusinessEnabled,
+      presenceEnabled: currentSettings.presenceEnabled ?? false,
       agentBaseStipend: currentSettings.agentBaseStipend ?? 50_000,
       maximumPerformanceBonus: currentSettings.maximumPerformanceBonus ?? 50_000,
     })
@@ -252,17 +254,7 @@ async function revokeInvitation(invitationId: Id<'invitations'>) {
 
 <template>
   <div class="page-container">
-    <div class="mb-6">
-      <p class="text-xs text-[var(--color-accent)] tracking-[0.16em] font-800 mb-1 uppercase">
-        Administration du tenant
-      </p>
-      <h1 class="text-2xl font-900 m-0 sm:text-3xl">
-        Paramètres et équipe
-      </h1>
-      <p class="text-sm text-[var(--color-text-muted)] mb-0 mt-2">
-        Organisation, membres, rôles, équipes et politique de rémunération.
-      </p>
-    </div>
+    <AppPageHeader title="Paramètres et équipe" description="Organisation, membres, rôles, équipes et politique de rémunération." />
 
     <p v-if="feedback" class="text-sm mb-5 px-4 py-3 border border-[var(--color-border)] rounded-xl bg-[var(--color-surface)]" role="status">
       {{ feedback }}
@@ -302,6 +294,12 @@ async function revokeInvitation(invitationId: Id<'invitations'>) {
               <label class="text-sm px-3.5 py-2.5 border border-[var(--color-border)] rounded-xl bg-[var(--color-bg-deep)] flex gap-3 min-h-11 items-center">
                 <input v-model="settingsForm.whatsappBusinessEnabled" type="checkbox" :disabled="!canAdmin">
                 Activer après configuration
+              </label>
+            </AppFormField>
+            <AppFormField label="Présence d’équipe">
+              <label class="text-sm px-3.5 py-2.5 border border-[var(--color-border)] rounded-xl bg-[var(--color-bg-deep)] flex gap-3 min-h-11 items-center">
+                <input v-model="settingsForm.presenceEnabled" type="checkbox" :disabled="!canAdmin">
+                Afficher les membres connectés
               </label>
             </AppFormField>
           </div>

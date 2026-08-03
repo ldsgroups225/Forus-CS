@@ -19,6 +19,26 @@ const publicEnv = {
   siteUrl: process.env.NUXT_PUBLIC_SITE_URL ?? localPublicEnv.NUXT_PUBLIC_SITE_URL ?? '',
 }
 
+const securityHeaders = {
+  'Content-Security-Policy': [
+    'default-src \'self\'',
+    'base-uri \'self\'',
+    'object-src \'none\'',
+    'frame-ancestors \'none\'',
+    'form-action \'self\' https://*.convex.site',
+    'img-src \'self\' data: blob:',
+    'font-src \'self\' data: https://fonts.gstatic.com',
+    'style-src \'self\' \'unsafe-inline\' https://fonts.googleapis.com',
+    'script-src \'self\' \'unsafe-inline\'',
+    'connect-src \'self\' https://*.convex.cloud wss://*.convex.cloud https://*.convex.site',
+    'worker-src \'self\' blob:',
+  ].join('; '),
+  'Permissions-Policy': 'camera=(), geolocation=(), microphone=(self), payment=(), usb=()',
+  'Referrer-Policy': 'strict-origin-when-cross-origin',
+  'X-Content-Type-Options': 'nosniff',
+  'X-Frame-Options': 'DENY',
+}
+
 export default defineNuxtConfig({
   modules: [
     '@vueuse/nuxt',
@@ -53,6 +73,7 @@ export default defineNuxtConfig({
       meta: [
         { name: 'viewport', content: 'width=device-width, initial-scale=1' },
         { name: 'description', content: appDescription },
+        { name: 'apple-mobile-web-app-capable', content: 'yes' },
         { name: 'apple-mobile-web-app-status-bar-style', content: 'black-translucent' },
         { name: 'theme-color', content: '#07111f' },
       ],
@@ -67,13 +88,10 @@ export default defineNuxtConfig({
     classSuffix: '',
   },
 
-  runtimeConfig: {
-    // eslint-disable-next-line node/prefer-global/process
-    groqApiKey: process.env.NUXT_GROQ_API_KEY ?? '',
-    public: publicEnv,
-  },
+  runtimeConfig: { public: publicEnv },
 
   routeRules: {
+    '/**': { headers: securityHeaders },
     '/': { ssr: false },
     '/login': { ssr: false },
     '/register': { ssr: false },

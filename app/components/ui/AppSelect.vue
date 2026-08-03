@@ -20,7 +20,7 @@ const model = defineModel<string | undefined>()
     :id="id"
     v-model="model"
     :disabled="disabled"
-    class="text-sm text-[var(--color-text)] px-3.5 py-2.5 appearance-none border border-[var(--color-border)] rounded-xl bg-[var(--color-bg-deep)] min-h-11 w-full disabled:opacity-60 disabled:cursor-not-allowed focus-ring"
+    class="text-sm text-[var(--color-text)] px-3.5 py-2.5 appearance-none border border-[var(--color-border)] rounded-xl bg-[var(--color-bg-deep)] min-h-11 w-full transition-colors hover:border-[var(--color-border-strong)] disabled:opacity-60 disabled:cursor-not-allowed focus-ring"
   >
     <option v-if="placeholder" value="" disabled>
       {{ placeholder }}

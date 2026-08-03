@@ -11,6 +11,12 @@ const publicPaths = [
 ]
 
 describe('configuration PWA', () => {
+  it('fournit un shell installable et navigable hors ligne', () => {
+    expect(pwa.manifest?.start_url).toBe('/')
+    expect(pwa.manifest?.display).toBe('standalone')
+    expect(pwa.workbox?.navigateFallback).toBe('/')
+  })
+
   it('exclut les routes publiques sensibles du fallback offline', () => {
     for (const path of publicPaths) {
       expect(navigationFallbackDenylist.some(pattern => pattern.test(path)), path)
@@ -33,5 +39,10 @@ describe('configuration PWA', () => {
 
     expect(urlPattern({ request: { mode: 'navigate' }, url: new URL('/o/forus-group/operations', 'https://forus-cs.vercel.app') }))
       .toBe(true)
+
+    expect(pagesRoute?.options?.expiration).toEqual({
+      maxEntries: 20,
+      maxAgeSeconds: 60 * 60 * 24,
+    })
   })
 })

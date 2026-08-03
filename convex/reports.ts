@@ -2,6 +2,14 @@ import { v } from 'convex/values'
 import { calculateAgentPerformance, estimatePerformanceBonus } from '../shared/performanceScore'
 import { query } from './_generated/server'
 import { requireOrganizationAccess } from './lib/authz'
+import { agentNamespace, availableCallsByOrganization, callsByAgent, callsByOrganization } from './lib/reportAggregates'
+
+function timeBounds(from: number, to: number) {
+  return {
+    lower: { key: from, inclusive: true },
+    upper: { key: to, inclusive: true },
+  }
+}
 
 export const overview = query({
   args: {
@@ -11,14 +19,14 @@ export const overview = query({
   },
   handler: async (ctx, args) => {
     await requireOrganizationAccess(ctx, args.organizationId)
-    const [needs, missions, incidents, calls, followUps, carriers, memberships] = await Promise.all([
+    const from = args.from ?? 0
+    const to = args.to ?? Number.MAX_SAFE_INTEGER
+    const [needs, missions, incidents, followUps, carriers, memberships, callTotal, answeredCalls, availableCalls] = await Promise.all([
       ctx.db.query('needs').withIndex('by_organization', query =>
         query.eq('organizationId', args.organizationId)).collect(),
       ctx.db.query('missions').withIndex('by_organization', query =>
         query.eq('organizationId', args.organizationId)).collect(),
       ctx.db.query('incidents').withIndex('by_organization', query =>
-        query.eq('organizationId', args.organizationId)).collect(),
-      ctx.db.query('callLogs').withIndex('by_organization', query =>
         query.eq('organizationId', args.organizationId)).collect(),
       ctx.db.query('followUps').withIndex('by_organization_due', query =>
         query.eq('organizationId', args.organizationId)).collect(),
@@ -26,14 +34,14 @@ export const overview = query({
         query.eq('organizationId', args.organizationId)).collect(),
       ctx.db.query('memberships').withIndex('by_organization', query =>
         query.eq('organizationId', args.organizationId)).collect(),
+      callsByOrganization.count(ctx, { namespace: args.organizationId, bounds: timeBounds(from, to) }),
+      callsByOrganization.sum(ctx, { namespace: args.organizationId, bounds: timeBounds(from, to) }),
+      availableCallsByOrganization.sum(ctx, { namespace: args.organizationId, bounds: timeBounds(from, to) }),
     ])
-    const from = args.from ?? 0
-    const to = args.to ?? Number.POSITIVE_INFINITY
     const inRange = (timestamp: number) => timestamp >= from && timestamp <= to
     const rangedNeeds = needs.filter(need => inRange(need.createdAt))
     const rangedMissions = missions.filter(mission => inRange(mission.createdAt))
     const rangedIncidents = incidents.filter(incident => inRange(incident.createdAt))
-    const rangedCalls = calls.filter(call => inRange(call.calledAt))
 
     return {
       needs: {
@@ -61,13 +69,12 @@ export const overview = query({
         critical: rangedIncidents.filter(incident => incident.severity === 'CRITICAL').length,
       },
       calls: {
-        total: rangedCalls.length,
-        available: rangedCalls.filter(call => call.outcome === 'AVAILABLE').length,
-        answerRate: rangedCalls.length === 0
+        total: callTotal,
+        available: availableCalls,
+        answerRate: callTotal === 0
           ? 0
           : Math.round(
-              rangedCalls.filter(call =>
-                call.outcome !== 'NO_ANSWER').length / rangedCalls.length * 100,
+              answeredCalls / callTotal * 100,
             ),
       },
       pendingFollowUps: followUps.filter(followUp => followUp.status === 'PENDING').length,
@@ -103,10 +110,8 @@ export const agentPerformance = query({
   },
   handler: async (ctx, args) => {
     await requireOrganizationAccess(ctx, args.organizationId)
-    const [memberships, calls, carriers, options, followUps, settings] = await Promise.all([
+    const [memberships, carriers, options, followUps, settings] = await Promise.all([
       ctx.db.query('memberships').withIndex('by_organization', query =>
-        query.eq('organizationId', args.organizationId)).collect(),
-      ctx.db.query('callLogs').withIndex('by_organization', query =>
         query.eq('organizationId', args.organizationId)).collect(),
       ctx.db.query('carriers').withIndex('by_organization', query =>
         query.eq('organizationId', args.organizationId)).collect(),
@@ -121,12 +126,19 @@ export const agentPerformance = query({
     const inRange = (timestamp: number) =>
       timestamp >= args.from && timestamp <= args.to
 
-    return memberships
+    return await Promise.all(memberships
       .filter(membership => membership.role === 'AGENT' && membership.isActive)
-      .map((membership) => {
-        const agentCalls = calls.filter(call =>
-          call.createdBy === membership.userId && inRange(call.calledAt))
-        const answeredCalls = agentCalls.filter(call => call.outcome !== 'NO_ANSWER')
+      .map(async (membership) => {
+        const [calls, answeredCalls] = await Promise.all([
+          callsByAgent.count(ctx, {
+            namespace: agentNamespace(args.organizationId, membership.userId),
+            bounds: timeBounds(args.from, args.to),
+          }),
+          callsByAgent.sum(ctx, {
+            namespace: agentNamespace(args.organizationId, membership.userId),
+            bounds: timeBounds(args.from, args.to),
+          }),
+        ])
         const newCarriers = carriers.filter(carrier =>
           carrier.createdBy === membership.userId && inRange(carrier.createdAt)).length
         const submittedOptions = options.filter(option =>
@@ -136,11 +148,11 @@ export const agentPerformance = query({
           && followUp.status === 'COMPLETED'
           && followUp.completedAt !== undefined
           && inRange(followUp.completedAt)).length
-        const responseRate = agentCalls.length === 0
+        const responseRate = calls === 0
           ? 0
-          : Math.round(answeredCalls.length / agentCalls.length * 100)
+          : Math.round(answeredCalls / calls * 100)
         const score = calculateAgentPerformance({
-          calls: agentCalls.length,
+          calls,
           workingDays,
           newCarriers,
           submittedOptions,
@@ -151,7 +163,7 @@ export const agentPerformance = query({
         return {
           userId: membership.userId,
           displayName: membership.displayName ?? membership.email ?? membership.userId,
-          calls: agentCalls.length,
+          calls,
           responseRate,
           newCarriers,
           submittedOptions,
@@ -164,7 +176,7 @@ export const agentPerformance = query({
           ),
           eligibility: 'TO_VALIDATE' as const,
         }
-      })
-      .sort((left, right) => right.score.total - left.score.total)
+      }))
+      .then(results => results.sort((left, right) => right.score.total - left.score.total))
   },
 })

@@ -33,27 +33,16 @@ const totalTrucks = computed(() =>
 
 <template>
   <div class="page-container">
-    <div class="mb-6 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
-      <div>
-        <p class="text-xs text-[var(--color-accent)] tracking-[0.16em] font-800 mb-1 uppercase">
-          Exécution opérationnelle
-        </p>
-        <h1 class="text-2xl font-900 m-0 sm:text-3xl">
-          Missions confirmées
-        </h1>
-        <p class="text-sm text-[var(--color-text-muted)] mb-0 mt-2">
-          Une mission est créée automatiquement pour chaque option acceptée.
-        </p>
-      </div>
-      <div class="flex gap-2">
+    <AppPageHeader title="Missions confirmées" description="Une mission est créée automatiquement pour chaque option acceptée.">
+      <template #actions>
         <AppBadge tone="success" dot>
           {{ missions?.length ?? 0 }} mission(s)
         </AppBadge>
         <AppBadge tone="accent">
           {{ totalTrucks }} camion(s)
         </AppBadge>
-      </div>
-    </div>
+      </template>
+    </AppPageHeader>
 
     <AppCard class="mb-5 p-3 sm:p-4">
       <div class="relative">

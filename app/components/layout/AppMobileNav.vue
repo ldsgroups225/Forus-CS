@@ -25,7 +25,7 @@ const moreItems = computed(() => [
 </script>
 
 <template>
-  <div v-if="moreOpen && !isAgent" class="p-4 pb-24 border-t border-[var(--color-border)] bg-[var(--color-bg-deep)] inset-x-0 bottom-0 fixed z-49 lg:hidden">
+  <div v-if="moreOpen && !isAgent" class="p-4 pb-24 border-t border-[var(--color-border)] bg-[var(--color-bg-deep)] inset-x-0 bottom-0 fixed z-49 lg:hidden" role="dialog" aria-label="Navigation complémentaire">
     <div class="mb-3 flex items-center justify-between">
       <strong class="text-sm">Navigation</strong>
       <button type="button" class="icon-btn" aria-label="Fermer la navigation" @click="moreOpen = false">

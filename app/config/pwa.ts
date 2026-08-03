@@ -18,6 +18,7 @@ export const pwa: ModuleOptions = {
   base: scope,
   manifest: {
     id: scope,
+    start_url: scope,
     scope,
     name: appName,
     short_name: 'Forus CS',
@@ -27,6 +28,8 @@ export const pwa: ModuleOptions = {
     display: 'standalone',
     orientation: 'any',
     lang: 'fr',
+    categories: ['business', 'productivity'],
+    prefer_related_applications: false,
     icons: [
       {
         src: 'pwa-192x192.png',
@@ -49,9 +52,9 @@ export const pwa: ModuleOptions = {
   workbox: {
     skipWaiting: true,
     clientsClaim: true,
-    globPatterns: ['**/*.{js,css,html,txt,png,ico,svg}'],
+    globPatterns: ['**/*.{js,css,html,txt,png,ico,svg,woff2}'],
     navigateFallbackDenylist: navigationFallbackDenylist,
-    navigateFallback: '/offline',
+    navigateFallback: '/',
     cleanupOutdatedCaches: true,
     runtimeCaching: [
       {
@@ -82,7 +85,11 @@ export const pwa: ModuleOptions = {
         handler: 'NetworkFirst',
         options: {
           cacheName: 'forus-pages',
-          networkTimeoutSeconds: 10,
+          networkTimeoutSeconds: 3,
+          expiration: {
+            maxEntries: 20,
+            maxAgeSeconds: 60 * 60 * 24,
+          },
           cacheableResponse: {
             statuses: [0, 200],
           },

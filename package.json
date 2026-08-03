@@ -25,7 +25,12 @@
     "test:watch": "vitest"
   },
   "dependencies": {
+    "@convex-dev/action-cache": "catalog:",
+    "@convex-dev/aggregate": "catalog:",
     "@convex-dev/better-auth": "catalog:",
+    "@convex-dev/presence": "catalog:",
+    "@convex-dev/rate-limiter": "catalog:",
+    "@convex-dev/workpool": "catalog:",
     "better-auth": "catalog:",
     "convex": "catalog:",
     "react": "catalog:"

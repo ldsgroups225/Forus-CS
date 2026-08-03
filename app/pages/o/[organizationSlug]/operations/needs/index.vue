@@ -59,25 +59,16 @@ const filteredNeeds = computed(() => {
 
 <template>
   <div class="page-container">
-    <div class="mb-6 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
-      <div>
-        <p class="text-xs text-[var(--color-accent)] tracking-[0.16em] font-800 mb-1 uppercase">
-          Pilotage opérationnel
-        </p>
-        <h1 class="text-2xl font-900 m-0 sm:text-3xl">
-          Besoins
-        </h1>
-        <p class="text-sm text-[var(--color-text-muted)] mb-0 mt-2">
-          Les besoins actifs restent visibles jusqu’à satisfaction ou annulation.
-        </p>
-      </div>
-      <AppButton @click="navigateTo(`/o/${organization?.slug}/operations/needs/new`)">
-        <template #leading>
-          <span class="i-carbon-add" />
-        </template>
-        Nouveau besoin
-      </AppButton>
-    </div>
+    <AppPageHeader title="Besoins" description="Les besoins actifs restent visibles jusqu’à satisfaction ou annulation.">
+      <template #actions>
+        <AppButton @click="navigateTo(`/o/${organization?.slug}/operations/needs/new`)">
+          <template #leading>
+            <span class="i-carbon-add" />
+          </template>
+          Nouveau besoin
+        </AppButton>
+      </template>
+    </AppPageHeader>
 
     <AppCard class="mb-5 p-3 sm:p-4">
       <div class="gap-3 grid xl:grid-cols-[1.4fr_repeat(4,1fr)] sm:grid-cols-2">

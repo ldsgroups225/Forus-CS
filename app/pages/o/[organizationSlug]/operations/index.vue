@@ -39,25 +39,16 @@ const metricCards = computed(() => [
 
 <template>
   <div class="page-container">
-    <div class="mb-6 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
-      <div>
-        <p class="text-xs text-[var(--color-accent)] tracking-[0.16em] font-800 mb-1 uppercase">
-          Responsable Opérations
-        </p>
-        <h1 class="text-2xl font-900 m-0 sm:text-3xl">
-          Tableau de bord
-        </h1>
-        <p class="text-sm text-[var(--color-text-muted)] mb-0 mt-2">
-          Vue en temps réel des besoins de {{ organization?.name }}.
-        </p>
-      </div>
-      <AppButton @click="navigateTo(`/o/${organization?.slug}/operations/needs/new`)">
-        <template #leading>
-          <span class="i-carbon-add" />
-        </template>
-        Nouveau besoin
-      </AppButton>
-    </div>
+    <AppPageHeader title="Tableau de bord" :description="`Vue en temps réel des besoins de ${organization?.name ?? 'votre organisation'}.`">
+      <template #actions>
+        <AppButton @click="navigateTo(`/o/${organization?.slug}/operations/needs/new`)">
+          <template #leading>
+            <span class="i-carbon-add" />
+          </template>
+          Nouveau besoin
+        </AppButton>
+      </template>
+    </AppPageHeader>
 
     <div v-if="isPending" class="gap-4 grid sm:grid-cols-2 xl:grid-cols-3">
       <AppCard v-for="index in 6" :key="index">

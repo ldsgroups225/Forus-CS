@@ -273,6 +273,7 @@ export default defineSchema({
     currency: v.string(),
     defaultCountryCode: v.string(),
     whatsappBusinessEnabled: v.boolean(),
+    presenceEnabled: v.optional(v.boolean()),
     agentBaseStipend: v.optional(v.number()),
     maximumPerformanceBonus: v.optional(v.number()),
     updatedAt: v.number(),
@@ -487,6 +488,34 @@ export default defineSchema({
   })
     .index('by_user', ['userId', 'createdAt'])
     .index('by_user_read', ['userId', 'isRead', 'createdAt']),
+
+  transcriptionJobs: defineTable({
+    organizationId: v.id('organizations'),
+    createdBy: v.string(),
+    storageId: v.optional(v.id('_storage')),
+    audioHash: v.string(),
+    mimeType: v.string(),
+    model: v.string(),
+    language: v.string(),
+    status: v.union(
+      v.literal('UPLOADING'),
+      v.literal('QUEUED'),
+      v.literal('PROCESSING'),
+      v.literal('COMPLETED'),
+      v.literal('FAILED'),
+      v.literal('RATE_LIMITED'),
+    ),
+    workId: v.optional(v.string()),
+    text: v.optional(v.string()),
+    duration: v.optional(v.number()),
+    retryAfter: v.optional(v.number()),
+    errorCode: v.optional(v.string()),
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  })
+    .index('by_organization_created', ['organizationId', 'createdAt'])
+    .index('by_organization_hash', ['organizationId', 'audioHash'])
+    .index('by_storage', ['storageId']),
 
   mutationReceipts: defineTable({
     organizationId: v.id('organizations'),

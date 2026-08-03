@@ -39,22 +39,13 @@ const pendingCount = computed(() =>
 
 <template>
   <div class="page-container">
-    <div class="mb-6 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
-      <div>
-        <p class="text-xs text-[var(--color-accent)] tracking-[0.16em] font-800 mb-1 uppercase">
-          Décision opérationnelle
-        </p>
-        <h1 class="text-2xl font-900 m-0 sm:text-3xl">
-          Options transporteurs
-        </h1>
-        <p class="text-sm text-[var(--color-text-muted)] mb-0 mt-2">
-          Comparez, négociez et transformez les propositions retenues en missions.
-        </p>
-      </div>
-      <AppBadge :tone="pendingCount ? 'warning' : 'success'" dot>
-        {{ pendingCount }} à décider
-      </AppBadge>
-    </div>
+    <AppPageHeader title="Options transporteurs" description="Comparez, négociez et transformez les propositions retenues en missions.">
+      <template #actions>
+        <AppBadge :tone="pendingCount ? 'warning' : 'success'" dot>
+          {{ pendingCount }} à décider
+        </AppBadge>
+      </template>
+    </AppPageHeader>
 
     <AppCard class="mb-5 p-3 sm:p-4">
       <div class="gap-3 grid sm:grid-cols-2">

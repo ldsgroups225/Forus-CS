@@ -13,7 +13,7 @@ withDefaults(defineProps<{
     class="surface-panel"
     :class="[
       padded && 'p-4 sm:p-5',
-      interactive && 'transition hover:border-[var(--color-border-strong)] hover:bg-[var(--color-surface-raised)]',
+      interactive && 'transition-colors duration-150 hover:border-[var(--color-border-strong)] hover:bg-[var(--color-surface-raised)]',
     ]"
   >
     <slot />

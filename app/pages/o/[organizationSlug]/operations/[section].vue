@@ -17,14 +17,7 @@ const label = computed(() => labels[section.value] ?? 'Module')
 
 <template>
   <div class="page-container">
-    <div class="mb-6">
-      <p class="text-xs text-[var(--color-accent)] tracking-[0.16em] font-800 mb-1 uppercase">
-        Forus Call Center
-      </p>
-      <h1 class="text-2xl font-900 m-0 sm:text-3xl">
-        {{ label }}
-      </h1>
-    </div>
+    <AppPageHeader :title="label" description="Ce module sera bientôt disponible dans le parcours opérationnel." />
     <AppEmptyState
       :title="`${label} — À venir`"
       description="Ce module est identifié dans l’architecture produit, mais il ne fait pas partie du premier parcours vertical."

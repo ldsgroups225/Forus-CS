@@ -32,8 +32,8 @@ withDefaults(defineProps<{
       variant === 'primary' && 'border-[var(--color-accent)] bg-[var(--color-accent)] text-[var(--color-button-text)] hover:bg-[var(--color-accent-strong)]',
       variant === 'secondary' && 'border-[var(--color-border-strong)] bg-[var(--color-surface-raised)] text-[var(--color-text)] hover:border-[var(--color-accent)]',
       variant === 'ghost' && 'border-transparent bg-transparent text-[var(--color-text-muted)] hover:bg-[var(--color-accent-soft)] hover:text-[var(--color-accent)]',
-      variant === 'danger' && 'border-[var(--color-danger)] bg-[var(--color-danger)] text-white hover:brightness-110',
-      variant === 'success' && 'border-[var(--color-success)] bg-[var(--color-success)] text-[#04150b] hover:brightness-110',
+      variant === 'danger' && 'border-[var(--color-danger)] bg-[var(--color-danger)] text-[var(--color-button-text)] hover:brightness-110',
+      variant === 'success' && 'border-[var(--color-success)] bg-[var(--color-success)] text-[var(--color-button-text)] hover:brightness-110',
     ]"
   >
     <span v-if="loading" class="i-carbon-circle-dash text-lg animate-spin" aria-hidden="true" />

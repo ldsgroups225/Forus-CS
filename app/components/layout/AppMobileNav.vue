@@ -8,6 +8,11 @@ const slug = computed(() => {
 })
 const base = computed(() => `/o/${slug.value}/operations`)
 const isAgent = computed(() => organization.value?.role === 'AGENT')
+const agentNavigation = computed(() => [
+  { id: 'needs', label: 'Demandes', icon: 'i-carbon-task', to: `${base.value}/calling` },
+  { id: 'call', label: 'Appeler', icon: 'i-carbon-phone-filled', to: `${base.value}/calling/appeler` },
+  { id: 'portfolio', label: 'Portefeuille', icon: 'i-carbon-delivery-truck', to: `${base.value}/calling/portfolio` },
+])
 const items = computed(() => [
   { label: 'Accueil', icon: 'i-carbon-home', to: base.value },
   { label: 'Besoins', icon: 'i-carbon-task', to: `${base.value}/needs` },
@@ -22,6 +27,14 @@ const moreItems = computed(() => [
   { label: 'Rapports', icon: 'i-carbon-chart-column', to: `${base.value}/rapports` },
   { label: 'Paramètres', icon: 'i-carbon-settings', to: `${base.value}/parametres` },
 ])
+
+function isAgentNavigationActive(id: string) {
+  const callingBase = `${base.value}/calling`
+  if (id === 'needs')
+    return route.path === callingBase || (!route.path.startsWith(`${callingBase}/appeler`) && !route.path.startsWith(`${callingBase}/portfolio`))
+
+  return route.path === `${callingBase}/${id === 'call' ? 'appeler' : 'portfolio'}`
+}
 </script>
 
 <template>
@@ -40,18 +53,21 @@ const moreItems = computed(() => [
   </div>
   <nav
     class="px-2 pb-[env(safe-area-inset-bottom)] border-t border-[var(--color-border)] bg-[var(--color-bg-deep)]/98 grid h-18 inset-x-0 bottom-0 fixed z-50 lg:hidden"
-    :class="[isAgent ? 'grid-cols-2 gap-2' : 'grid-cols-5', isAgent && 'agent-mobile-nav']"
+    :class="[isAgent ? 'grid-cols-3 gap-2' : 'grid-cols-5', isAgent && 'agent-mobile-nav']"
     aria-label="Navigation mobile"
   >
     <template v-if="isAgent">
-      <a href="#active-needs" class="agent-mobile-nav-item focus-ring">
-        <span class="i-carbon-task text-xl" aria-hidden="true" />
-        <span>Demandes</span>
-      </a>
-      <a href="#calling-contacts" class="agent-mobile-nav-item agent-mobile-nav-primary focus-ring">
-        <span class="i-carbon-phone-filled text-xl" aria-hidden="true" />
-        <span>Appeler</span>
-      </a>
+      <NuxtLink
+        v-for="item in agentNavigation"
+        :key="item.id"
+        :to="item.to"
+        class="agent-mobile-nav-item focus-ring"
+        :class="isAgentNavigationActive(item.id) && 'agent-mobile-nav-item-active'"
+        :aria-current="isAgentNavigationActive(item.id) ? 'page' : undefined"
+      >
+        <span :class="item.icon" class="text-xl" aria-hidden="true" />
+        <span>{{ item.label }}</span>
+      </NuxtLink>
     </template>
     <NuxtLink
       v-for="item in items"
@@ -97,7 +113,7 @@ const moreItems = computed(() => [
   font-size: 0.68rem;
   font-weight: 800;
 }
-.agent-mobile-nav-primary {
+.agent-mobile-nav-item-active {
   background: var(--color-accent);
   color: var(--color-button-text);
   box-shadow: 0 6px 18px rgb(32 199 183 / 22%);

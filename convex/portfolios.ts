@@ -128,7 +128,8 @@ export const assignToCallingAgent = mutation({
     const now = Date.now()
     if (existing) {
       await ctx.db.patch(existing._id, {
-        agentId: callingAgent.linkedUserId,
+        // An envelope is a distinct portfolio authority, not a duplicate direct assignment.
+        agentId: undefined,
         callingAgentId: args.callingAgentId,
         assignedAt: now,
         assignedBy: userId,
@@ -138,7 +139,6 @@ export const assignToCallingAgent = mutation({
       await ctx.db.insert('carrierAssignments', {
         organizationId: carrier.organizationId,
         carrierId: args.carrierId,
-        agentId: callingAgent.linkedUserId,
         callingAgentId: args.callingAgentId,
         assignedAt: now,
         assignedBy: userId,

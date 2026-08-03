@@ -4,6 +4,7 @@ import { v } from 'convex/values'
 import { mutation, query } from './_generated/server'
 import { writeAuditLog } from './lib/audit'
 import { requireAuthenticatedUser, requireOrganizationAccess } from './lib/authz'
+import { requireCarrierWriteAccess } from './lib/carrierAuthz'
 import { findIdempotentResult, recordIdempotentResult } from './lib/idempotency'
 import { createNotification } from './lib/notifications'
 import { insertCallIntoReports } from './lib/reportAggregates'
@@ -48,12 +49,19 @@ export const log = mutation({
   },
   handler: async (ctx, args) => {
     const { userId } = await requireAuthenticatedUser(ctx)
-    await requireOrganizationAccess(ctx, args.organizationId)
+    const { membership } = await requireOrganizationAccess(ctx, args.organizationId)
     const receipt = await findIdempotentResult(ctx, args.organizationId, args.idempotencyKey)
     if (receipt?.resultId)
       return receipt.resultId
 
     await validateRelations(ctx, args.organizationId, args.carrierId, args.needId)
+    if (membership.role === 'AGENT') {
+      if (!args.carrierId)
+        throw new Error('CALL_CARRIER_REQUIRED')
+      if (!args.needId)
+        throw new Error('CALL_NEED_REQUIRED')
+      await requireCarrierWriteAccess(ctx, args.organizationId, args.carrierId)
+    }
     const notes = args.notes?.trim() || undefined
     const phone = args.phone?.trim() || undefined
     if (!args.carrierId && !phone)
@@ -107,19 +115,26 @@ export const createFollowUp = mutation({
   },
   handler: async (ctx, args) => {
     const { userId } = await requireAuthenticatedUser(ctx)
-    await requireOrganizationAccess(ctx, args.organizationId)
+    const { membership } = await requireOrganizationAccess(ctx, args.organizationId)
     const receipt = await findIdempotentResult(ctx, args.organizationId, args.idempotencyKey)
     if (receipt?.resultId)
       return receipt.resultId
 
     await validateRelations(ctx, args.organizationId, args.carrierId, args.needId)
+    if (membership.role === 'AGENT') {
+      if (!args.carrierId || !args.needId)
+        throw new Error('FOLLOW_UP_CALLING_CONTEXT_REQUIRED')
+      if (args.assignedTo && args.assignedTo !== userId)
+        throw new Error('FOLLOW_UP_ASSIGNEE_FORBIDDEN')
+      await requireCarrierWriteAccess(ctx, args.organizationId, args.carrierId)
+    }
     const assignedTo = args.assignedTo ?? userId
-    const membership = await ctx.db
+    const assigneeMembership = await ctx.db
       .query('memberships')
       .withIndex('by_organization_user', query =>
         query.eq('organizationId', args.organizationId).eq('userId', assignedTo))
       .unique()
-    if (!membership?.isActive)
+    if (!assigneeMembership?.isActive)
       throw new Error('FOLLOW_UP_ASSIGNEE_INVALID')
     if (!Number.isFinite(args.dueAt))
       throw new Error('FOLLOW_UP_DUE_AT_INVALID')

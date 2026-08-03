@@ -201,13 +201,16 @@ export default defineSchema({
     carrierName: v.string(),
     carrierPhone: v.optional(v.string()),
     carrierEmail: v.optional(v.string()),
+    source: v.optional(v.union(v.literal('APPEL'), v.literal('RECOMMANDATION'))),
     truckType: v.string(),
     proposedTruckCount: v.number(),
     acceptedTruckCount: v.optional(v.number()),
     pricePerTruck: v.number(),
     availableAt: v.number(),
+    acceptedDestination: v.optional(v.string()),
     paymentTerms: v.optional(v.string()),
     documentsConfirmed: v.boolean(),
+    documentStatus: v.optional(v.union(v.literal('TO_VERIFY'), v.literal('CONFIRMED'))),
     notes: v.optional(v.string()),
     decisionNote: v.optional(v.string()),
     status: carrierOptionStatus,
@@ -223,6 +226,25 @@ export default defineSchema({
     .index('by_organization_reference', ['organizationId', 'reference'])
     .index('by_need', ['needId'])
     .index('by_need_status', ['needId', 'status']),
+
+  // A named vehicle reported during a call. vehicleId is optional so historic
+  // and newly reported registrations remain readable until the fleet is matched.
+  carrierOptionVehicles: defineTable({
+    organizationId: v.id('organizations'),
+    optionId: v.id('carrierOptions'),
+    vehicleId: v.optional(v.id('vehicles')),
+    registration: v.string(),
+    normalizedRegistration: v.string(),
+    truckType: v.string(),
+    capacityTons: v.number(),
+    location: v.string(),
+    documentsConfirmed: v.boolean(),
+    createdAt: v.number(),
+    createdBy: v.string(),
+  })
+    .index('by_option', ['optionId'])
+    .index('by_vehicle', ['vehicleId'])
+    .index('by_organization_registration', ['organizationId', 'normalizedRegistration']),
 
   missions: defineTable({
     organizationId: v.id('organizations'),
@@ -254,6 +276,22 @@ export default defineSchema({
     .index('by_organization_reference', ['organizationId', 'reference'])
     .index('by_need', ['needId'])
     .index('by_option', ['optionId']),
+
+  // The operational assignment preserves the plate even when a vehicle has
+  // not yet been reconciled with the fleet register.
+  missionVehicleAssignments: defineTable({
+    organizationId: v.id('organizations'),
+    missionId: v.id('missions'),
+    optionVehicleId: v.id('carrierOptionVehicles'),
+    vehicleId: v.optional(v.id('vehicles')),
+    registration: v.string(),
+    normalizedRegistration: v.string(),
+    createdAt: v.number(),
+    createdBy: v.string(),
+  })
+    .index('by_mission', ['missionId'])
+    .index('by_vehicle', ['vehicleId'])
+    .index('by_organization_registration', ['organizationId', 'normalizedRegistration']),
 
   missionEvents: defineTable({
     organizationId: v.id('organizations'),
@@ -417,6 +455,22 @@ export default defineSchema({
     .index('by_organization_agent', ['organizationId', 'agentId'])
     .index('by_organization_calling_agent', ['organizationId', 'callingAgentId']),
 
+  callingEscalations: defineTable({
+    organizationId: v.id('organizations'),
+    needId: v.optional(v.id('needs')),
+    carrierName: v.string(),
+    phone: v.optional(v.string()),
+    source: v.string(),
+    note: v.string(),
+    status: v.union(v.literal('PENDING'), v.literal('RESOLVED')),
+    createdAt: v.number(),
+    createdBy: v.string(),
+    resolvedAt: v.optional(v.number()),
+    resolvedBy: v.optional(v.string()),
+  })
+    .index('by_organization_status', ['organizationId', 'status', 'createdAt'])
+    .index('by_need', ['needId']),
+
   incidents: defineTable({
     organizationId: v.id('organizations'),
     reference: v.string(),
@@ -482,12 +536,14 @@ export default defineSchema({
     title: v.string(),
     body: v.string(),
     href: v.optional(v.string()),
+    deduplicationKey: v.optional(v.string()),
     isRead: v.boolean(),
     createdAt: v.number(),
     readAt: v.optional(v.number()),
   })
     .index('by_user', ['userId', 'createdAt'])
-    .index('by_user_read', ['userId', 'isRead', 'createdAt']),
+    .index('by_user_read', ['userId', 'isRead', 'createdAt'])
+    .index('by_organization_user_deduplication', ['organizationId', 'userId', 'deduplicationKey']),
 
   transcriptionJobs: defineTable({
     organizationId: v.id('organizations'),

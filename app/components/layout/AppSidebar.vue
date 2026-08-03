@@ -10,7 +10,10 @@ const { organization } = useCurrentOrganization()
 const base = computed(() => `/o/${organizationSlug.value}/operations`)
 
 const navigation = computed(() => organization.value?.role === 'AGENT'
-  ? [{ label: 'Calling', icon: 'i-carbon-phone-filled', to: `${base.value}/calling`, exact: true }]
+  ? [
+      { label: 'Besoins', icon: 'i-carbon-task', to: `${base.value}/calling`, exact: true },
+      { label: 'Portefeuille', icon: 'i-carbon-delivery-truck', to: `${base.value}/calling/portfolio` },
+    ]
   : [
       { label: 'Dashboard', icon: 'i-carbon-dashboard', to: base.value, exact: true },
       { label: 'Besoins', icon: 'i-carbon-task', to: `${base.value}/needs` },
@@ -19,6 +22,7 @@ const navigation = computed(() => organization.value?.role === 'AGENT'
       { label: 'Incidents', icon: 'i-carbon-warning-alt', to: `${base.value}/incidents` },
       { label: 'Clients', icon: 'i-carbon-enterprise', to: `${base.value}/clients` },
       { label: 'Transporteurs', icon: 'i-carbon-delivery-truck', to: `${base.value}/transporteurs` },
+      { label: 'Calling', icon: 'i-carbon-phone-filled', to: `${base.value}/calling/supervision` },
       { label: 'Rapports', icon: 'i-carbon-chart-column', to: `${base.value}/rapports` },
       { label: 'Paramètres', icon: 'i-carbon-settings', to: `${base.value}/parametres` },
     ])

@@ -115,6 +115,12 @@ async function enrichCarrier(
     activeVehicleCount: activeVehicles.length,
     availableVehicleCount,
     documentsValid,
+    vehicles: activeVehicles.map(vehicle => ({
+      _id: vehicle._id,
+      registration: vehicle.registration,
+      truckType: vehicle.truckType,
+      capacityTons: vehicle.capacityTons,
+    })),
     assignedAgentId: assignment?.agentId,
     assignedCallingAgentId: assignment?.callingAgentId,
     assignedCallingAgentName: callingAgent?.name,
@@ -311,11 +317,15 @@ export const list = query({
 export const listCallingQueue = query({
   args: {
     organizationId: v.id('organizations'),
+    needId: v.optional(v.id('needs')),
   },
   handler: async (ctx, args) => {
     const { membership } = await requireOrganizationAccess(ctx, args.organizationId)
     if (membership.role !== 'AGENT')
       throw new Error('CALLING_QUEUE_AGENT_ONLY')
+    const need = args.needId ? await ctx.db.get(args.needId) : null
+    if (args.needId && (!need || need.organizationId !== args.organizationId || !['OPEN', 'PARTIAL'].includes(need.status)))
+      throw new Error('CALLING_NEED_INVALID')
 
     const directAssignments = await ctx.db
       .query('carrierAssignments')
@@ -365,6 +375,13 @@ export const listCallingQueue = query({
         truckTypes: carrier.truckTypes,
         availableVehicleCount: carrier.availableVehicleCount,
         activeVehicleCount: carrier.activeVehicleCount,
+        vehicles: carrier.vehicles,
+        documentsValid: carrier.documentsValid,
+        matchScore: need
+          ? (carrier.truckTypes.includes(need.truckType) ? 4 : 0)
+          + (carrier.destinations.some(destination => destination.toLocaleLowerCase() === need.destination.toLocaleLowerCase()) ? 2 : 0)
+          + (carrier.availableVehicleCount ? 1 : 0)
+          : 0,
         lastCall: lastCall
           ? { outcome: lastCall.outcome, calledAt: lastCall.calledAt }
           : undefined,
@@ -374,7 +391,9 @@ export const listCallingQueue = query({
       }
     }))
 
-    return queue.filter((carrier): carrier is NonNullable<typeof carrier> => carrier !== null)
+    return queue
+      .filter((carrier): carrier is NonNullable<typeof carrier> => carrier !== null)
+      .sort((left, right) => right.matchScore - left.matchScore || right.availableVehicleCount - left.availableVehicleCount)
   },
 })
 

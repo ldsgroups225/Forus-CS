@@ -346,6 +346,30 @@ export const listActive = query({
   },
 })
 
+/** Agent landing: prioritised active coverage work, not a generic carrier list. */
+export const listCallingNeeds = query({
+  args: {
+    organizationId: v.id('organizations'),
+  },
+  handler: async (ctx, args) => {
+    const { membership } = await requireOrganizationAccess(ctx, args.organizationId)
+    if (membership.role !== 'AGENT')
+      throw new Error('CALLING_NEEDS_AGENT_ONLY')
+
+    const active = await Promise.all([
+      ctx.db.query('needs').withIndex('by_organization_status', query =>
+        query.eq('organizationId', args.organizationId).eq('status', 'OPEN')).collect(),
+      ctx.db.query('needs').withIndex('by_organization_status', query =>
+        query.eq('organizationId', args.organizationId).eq('status', 'PARTIAL')).collect(),
+    ])
+    const urgencyScore = { CRITICAL: 4, HIGH: 3, MEDIUM: 2, LOW: 1 } as const
+    return await Promise.all(active.flat()
+      .sort((left, right) => urgencyScore[right.urgency] - urgencyScore[left.urgency]
+        || left.mobilizationAt - right.mobilizationAt)
+      .map(need => enrichNeed(ctx, need)))
+  },
+})
+
 export const listAll = query({
   args: {
     organizationId: v.id('organizations'),

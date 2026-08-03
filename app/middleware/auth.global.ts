@@ -108,8 +108,11 @@ export default defineNuxtRouteMiddleware(async (to) => {
     return navigateTo(`/o/${organizations[0]?.slug}/operations`)
 
   const requestedOrganization = organizations.find(organization => organization.slug === requestedSlug)
-  if (requestedOrganization?.role === 'AGENT'
-    && to.path === `/o/${requestedSlug}/operations`) {
-    return navigateTo(`/o/${requestedSlug}/operations/calling`)
+  if (requestedOrganization?.role === 'AGENT') {
+    const callingBase = `/o/${requestedSlug}/operations/calling`
+    if (to.path === `/o/${requestedSlug}/operations`)
+      return navigateTo(callingBase)
+    if (!to.path.startsWith(callingBase) || to.path === `${callingBase}/supervision`)
+      return navigateTo(callingBase)
   }
 })

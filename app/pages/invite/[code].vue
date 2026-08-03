@@ -6,7 +6,11 @@ definePageMeta({ layout: false })
 
 const route = useRoute()
 const { $convex } = useNuxtApp()
+const { isAuthenticated, isPending: authPending } = useAuth()
 const code = computed(() => String(route.params.code ?? ''))
+const redirectPath = computed(() => `/invite/${code.value}`)
+const loginLocation = computed(() => ({ path: '/login', query: { redirect: redirectPath.value } }))
+const registerLocation = computed(() => ({ path: '/register', query: { redirect: redirectPath.value } }))
 const { data: invitation, isPending } = useConvexQuery(
   api.invitations.preview,
   computed(() => code.value ? { code: code.value } : null),
@@ -15,6 +19,11 @@ const accepting = shallowRef(false)
 const error = shallowRef('')
 
 async function acceptInvitation() {
+  if (!isAuthenticated.value) {
+    await navigateTo(loginLocation.value)
+    return
+  }
+
   accepting.value = true
   error.value = ''
   try {
@@ -51,9 +60,28 @@ async function acceptInvitation() {
         <p v-if="error" class="text-sm text-red-300 p-3 border border-red-500/25 rounded-xl bg-red-500/8" role="alert">
           {{ error }}
         </p>
-        <AppButton v-if="invitation.status === 'PENDING'" class="mt-4" block :loading="accepting" @click="acceptInvitation">
-          Accepter l’invitation
-        </AppButton>
+        <div v-if="invitation.status === 'PENDING'" class="mt-4 space-y-3">
+          <AppButton v-if="isAuthenticated" block :loading="accepting" @click="acceptInvitation">
+            Accepter l’invitation
+          </AppButton>
+          <div v-else class="gap-2 grid sm:grid-cols-2">
+            <NuxtLink
+              :to="registerLocation"
+              class="text-sm text-[#031413] font-700 px-4 py-2.5 border border-[var(--color-accent)] rounded-xl bg-[var(--color-accent)] inline-flex min-h-11 items-center justify-center hover:bg-[var(--color-accent-strong)] focus-ring"
+            >
+              Créer un compte
+            </NuxtLink>
+            <NuxtLink
+              :to="loginLocation"
+              class="text-sm text-[var(--color-text)] font-700 px-4 py-2.5 border border-[var(--color-border-strong)] rounded-xl bg-[var(--color-surface-raised)] inline-flex min-h-11 items-center justify-center hover:border-[var(--color-accent)] focus-ring"
+            >
+              Se connecter
+            </NuxtLink>
+          </div>
+          <p v-if="authPending" class="text-xs text-[var(--color-text-muted)] m-0">
+            Vérification de votre session…
+          </p>
+        </div>
         <p v-else class="text-sm text-orange-300 mt-4">
           Cette invitation n’est plus active.
         </p>

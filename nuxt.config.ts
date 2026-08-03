@@ -75,6 +75,7 @@ export default defineNuxtConfig({
     '/': { ssr: false },
     '/login': { ssr: false },
     '/register': { ssr: false },
+    '/invite/**': { ssr: false },
     '/onboarding/**': { ssr: false },
     '/o/**': { ssr: false },
   },

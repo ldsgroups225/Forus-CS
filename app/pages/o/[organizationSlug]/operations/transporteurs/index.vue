@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import type { CarrierFormValues, CarrierSegment } from '~~/shared/domain'
+import type { Id } from '../../../../../../convex/_generated/dataModel'
 import { splitNormalizedList } from '~~/shared/normalization'
 import { buildPhoneUrl, formatPhoneNumber } from '~/utils/formatters'
 import { buildWhatsAppUrl } from '~/utils/need-contact'
@@ -14,10 +15,15 @@ const queryArgs = computed(() => organization.value
   ? { organizationId: organization.value._id, includeInactive: true }
   : null)
 const { data: carriers, isPending, error } = useConvexQuery(api.carriers.list, queryArgs)
+const { data: callingAgents } = useConvexQuery(api.callingAgents.list, computed(() =>
+  organization.value ? { organizationId: organization.value._id } : null))
 const search = shallowRef('')
 const segment = shallowRef('')
+const portfolioFilter = shallowRef('')
+const draggingCarrierId = shallowRef<Id<'carriers'> | null>(null)
 const formOpen = shallowRef(false)
 const submitting = shallowRef(false)
+const creatingAgent = shallowRef(false)
 const feedback = shallowRef('')
 const form = reactive<CarrierFormValues>({
   name: '',
@@ -38,16 +44,34 @@ const segmentOptions = [
   { value: 'D', label: 'D · Inactif / suspendu' },
 ]
 const formSegmentOptions = segmentOptions.slice(1)
+const canManagePortfolios = computed(() =>
+  organization.value?.role === 'ORGANIZATION_ADMIN'
+  || organization.value?.role === 'OPERATIONS_MANAGER'
+  || organization.value?.role === 'SUPERVISOR')
+const portfolioOptions = computed(() => [
+  { value: '', label: 'Non attribué' },
+  ...(callingAgents.value ?? [])
+    .filter(agent => agent.isActive)
+    .map(agent => ({ value: agent._id, label: agent.name })),
+])
 const filteredCarriers = computed(() => {
   const needle = search.value.trim().toLocaleLowerCase('fr')
   return (carriers.value ?? []).filter(carrier =>
     (!segment.value || carrier.segment === segment.value)
+    && (
+      !portfolioFilter.value
+      || (portfolioFilter.value === 'unassigned'
+        ? !carrier.assignedCallingAgentId && !carrier.assignedAgentId
+        : carrier.assignedCallingAgentId === portfolioFilter.value)
+    )
     && (
       !needle
       || [
         carrier.name,
         carrier.contactName,
         carrier.phone,
+        carrier.assignedCallingAgentName,
+        carrier.sourcePortfolio,
         ...carrier.truckTypes,
         ...carrier.destinations,
       ].filter(Boolean).some(value => value?.toLocaleLowerCase('fr').includes(needle))
@@ -58,6 +82,81 @@ const activeCount = computed(() =>
 const availableCount = computed(() =>
   (carriers.value ?? []).reduce((total, carrier) =>
     total + carrier.availableVehicleCount, 0))
+const assignedCount = computed(() =>
+  (carriers.value ?? []).filter(carrier => carrier.assignedCallingAgentId || carrier.assignedAgentId).length)
+const unassignedCount = computed(() =>
+  (carriers.value ?? []).length - assignedCount.value)
+const portfolioLabelById = computed(() =>
+  new Map((callingAgents.value ?? []).map(agent => [agent._id, agent.name])))
+
+function carrierPortfolioLabel(carrier: NonNullable<typeof carriers.value>[number]) {
+  return carrier.assignedCallingAgentName
+    || (carrier.assignedCallingAgentId ? portfolioLabelById.value.get(carrier.assignedCallingAgentId) : undefined)
+    || carrier.sourcePortfolio
+    || (carrier.assignedAgentId ? 'Compte agent lié' : 'Non attribué')
+}
+
+async function createCallingAgent(name: string) {
+  if (!organization.value || !canManagePortfolios.value)
+    return
+
+  creatingAgent.value = true
+  feedback.value = ''
+  try {
+    await $convex.mutation(api.callingAgents.create, {
+      organizationId: organization.value._id,
+      name,
+    })
+    feedback.value = 'Enveloppe agent créée.'
+  }
+  catch {
+    feedback.value = 'Création de l’agent impossible.'
+  }
+  finally {
+    creatingAgent.value = false
+  }
+}
+
+async function assignCarrierToPortfolio(
+  carrierId: Id<'carriers'>,
+  callingAgentId: string,
+) {
+  if (!canManagePortfolios.value)
+    return
+
+  try {
+    if (!callingAgentId || callingAgentId === 'unassigned') {
+      await $convex.mutation(api.portfolios.unassign, { carrierId })
+      feedback.value = 'Transporteur retiré du portefeuille.'
+    }
+    else {
+      await $convex.mutation(api.portfolios.assignToCallingAgent, {
+        carrierId,
+        callingAgentId: callingAgentId as Id<'callingAgents'>,
+      })
+      feedback.value = 'Transporteur assigné.'
+    }
+  }
+  catch {
+    feedback.value = 'Assignation impossible.'
+  }
+}
+
+function startCarrierDrag(carrierId: Id<'carriers'>, event: DragEvent) {
+  draggingCarrierId.value = carrierId
+  event.dataTransfer?.setData('text/plain', carrierId)
+  if (event.dataTransfer)
+    event.dataTransfer.effectAllowed = 'move'
+}
+
+async function dropCarrierOnPortfolio(callingAgentId: string) {
+  const carrierId = draggingCarrierId.value
+  draggingCarrierId.value = null
+  if (!carrierId)
+    return
+
+  await assignCarrierToPortfolio(carrierId, callingAgentId)
+}
 
 async function createCarrier() {
   if (!organization.value || form.name.trim().length < 2 || form.phone.trim().length < 8)
@@ -145,7 +244,7 @@ async function createCarrier() {
         <p class="text-xs text-[var(--color-text-muted)] m-0">
           Portefeuille attribué
         </p>
-        <strong class="text-2xl font-900 mt-2 block">{{ carriers?.filter(item => item.assignedAgentId).length ?? 0 }}</strong>
+        <strong class="text-2xl font-900 mt-2 block">{{ assignedCount }}</strong>
       </AppCard>
       <AppCard>
         <p class="text-xs text-[var(--color-text-muted)] m-0">
@@ -158,6 +257,17 @@ async function createCarrier() {
     <p v-if="feedback" class="text-sm mb-4 px-4 py-3 border border-[var(--color-border)] rounded-xl bg-[var(--color-surface)]" role="status">
       {{ feedback }}
     </p>
+
+    <CallingPortfolioPanel
+      :agents="callingAgents ?? []"
+      :selected-id="portfolioFilter"
+      :unassigned-count="unassignedCount"
+      :can-manage="canManagePortfolios"
+      :creating="creatingAgent"
+      @create="createCallingAgent"
+      @drop-carrier="dropCarrierOnPortfolio"
+      @select="portfolioFilter = $event"
+    />
 
     <AppCard class="mb-5 p-3 sm:p-4">
       <div class="gap-3 grid sm:grid-cols-[1fr_14rem]">
@@ -184,7 +294,14 @@ async function createCarrier() {
       icon="i-carbon-delivery-truck"
     />
     <div v-else class="gap-4 grid md:grid-cols-2 xl:grid-cols-3">
-      <AppCard v-for="carrier in filteredCarriers" :key="carrier._id" :interactive="true">
+      <AppCard
+        v-for="carrier in filteredCarriers"
+        :key="carrier._id"
+        :interactive="true"
+        :draggable="canManagePortfolios"
+        @dragstart="startCarrierDrag(carrier._id, $event)"
+        @dragend="draggingCarrierId = null"
+      >
         <div class="flex gap-3 items-start justify-between">
           <div class="min-w-0">
             <div class="flex gap-2 items-center">
@@ -213,8 +330,16 @@ async function createCarrier() {
           <span class="p-2 rounded-lg bg-[var(--color-bg-deep)]">{{ carrier.activeVehicleCount }} véhicule(s)</span>
           <span class="p-2 rounded-lg bg-[var(--color-bg-deep)]">{{ carrier.availableVehicleCount }} disponible(s)</span>
           <span class="p-2 rounded-lg bg-[var(--color-bg-deep)]">{{ carrier.documentsValid ? 'Documents conformes' : 'Documents à revoir' }}</span>
-          <span class="p-2 rounded-lg bg-[var(--color-bg-deep)]">{{ carrier.assignedAgentId ? 'Portefeuille attribué' : 'Non attribué' }}</span>
+          <span class="p-2 rounded-lg bg-[var(--color-bg-deep)]">{{ carrierPortfolioLabel(carrier) }}</span>
         </div>
+        <AppSelect
+          v-if="canManagePortfolios"
+          :model-value="carrier.assignedCallingAgentId || ''"
+          class="mt-4"
+          :options="portfolioOptions"
+          aria-label="Assigner au portefeuille"
+          @update:model-value="assignCarrierToPortfolio(carrier._id, $event || '')"
+        />
         <p v-if="carrier.truckTypes.length" class="text-xs text-[var(--color-text-muted)] mb-0 mt-4 line-clamp-2">
           <strong class="text-[var(--color-text)]">Camions :</strong> {{ carrier.truckTypes.join(', ') }}
         </p>

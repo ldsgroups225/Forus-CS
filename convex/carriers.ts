@@ -1,5 +1,6 @@
 import type { Id } from './_generated/dataModel'
 import { v } from 'convex/values'
+import { assertCarrierReadAccess, canViewAllCarriers } from '../shared/carrierAccess'
 import { normalizePhoneKey } from '../shared/normalization'
 import { mutation, query } from './_generated/server'
 import { writeAuditLog } from './lib/audit'
@@ -73,6 +74,11 @@ function normalizeCarrier(input: CarrierInput) {
   }
 }
 
+function identityText(identity: object, key: string) {
+  const value = Reflect.get(identity, key)
+  return typeof value === 'string' ? value : undefined
+}
+
 async function enrichCarrier(
   ctx: Parameters<typeof requireOrganizationAccess>[0],
   carrierId: Id<'carriers'>,
@@ -91,6 +97,9 @@ async function enrichCarrier(
         query.eq('organizationId', carrier.organizationId).eq('carrierId', carrierId))
       .unique(),
   ])
+  const callingAgent = assignment?.callingAgentId
+    ? await ctx.db.get(assignment.callingAgentId)
+    : null
   const now = Date.now()
   const activeVehicles = vehicles.filter(vehicle => vehicle.isActive)
   const documentsValid = documents.length === 0 || documents.every(document =>
@@ -107,7 +116,23 @@ async function enrichCarrier(
     availableVehicleCount,
     documentsValid,
     assignedAgentId: assignment?.agentId,
+    assignedCallingAgentId: assignment?.callingAgentId,
+    assignedCallingAgentName: callingAgent?.name,
   }
+}
+
+async function linkedCallingAgentIds(
+  ctx: Parameters<typeof requireOrganizationAccess>[0],
+  organizationId: Id<'organizations'>,
+  userId: string,
+) {
+  const callingAgents = await ctx.db
+    .query('callingAgents')
+    .withIndex('by_organization_linked_user', query =>
+      query.eq('organizationId', organizationId).eq('linkedUserId', userId))
+    .collect()
+
+  return callingAgents.map(callingAgent => callingAgent._id)
 }
 
 export const create = mutation({
@@ -249,12 +274,34 @@ export const list = query({
     includeInactive: v.optional(v.boolean()),
   },
   handler: async (ctx, args) => {
-    await requireOrganizationAccess(ctx, args.organizationId)
+    const { membership } = await requireOrganizationAccess(ctx, args.organizationId)
+    const { identity } = await requireAuthenticatedUser(ctx)
+    const authenticatedEmail = identityText(identity, 'email')
     const carriers = await ctx.db
       .query('carriers')
       .withIndex('by_organization', query => query.eq('organizationId', args.organizationId))
       .collect()
-    const visible = args.includeInactive ? carriers : carriers.filter(carrier => carrier.isActive)
+    let visibleByRole = carriers
+    if (!canViewAllCarriers(membership, authenticatedEmail)) {
+      const linkedIds = await linkedCallingAgentIds(ctx, args.organizationId, membership.userId)
+      const directAssignments = await ctx.db
+        .query('carrierAssignments')
+        .withIndex('by_organization_agent', query =>
+          query.eq('organizationId', args.organizationId).eq('agentId', membership.userId))
+        .collect()
+      const envelopeAssignments = await Promise.all(linkedIds.map(async callingAgentId =>
+        await ctx.db
+          .query('carrierAssignments')
+          .withIndex('by_organization_calling_agent', query =>
+            query.eq('organizationId', args.organizationId).eq('callingAgentId', callingAgentId))
+          .collect()))
+      const assignedCarrierIds = new Set([
+        ...directAssignments.map(assignment => assignment.carrierId),
+        ...envelopeAssignments.flat().map(assignment => assignment.carrierId),
+      ])
+      visibleByRole = carriers.filter(carrier => assignedCarrierIds.has(carrier._id))
+    }
+    const visible = args.includeInactive ? visibleByRole : visibleByRole.filter(carrier => carrier.isActive)
     const enriched = await Promise.all(visible.map(carrier => enrichCarrier(ctx, carrier._id)))
 
     return enriched.filter(carrier => carrier !== null)
@@ -270,7 +317,19 @@ export const getById = query({
     if (!carrier)
       return null
 
-    await requireOrganizationAccess(ctx, carrier.organizationId)
+    const { membership } = await requireOrganizationAccess(ctx, carrier.organizationId)
+    const { identity } = await requireAuthenticatedUser(ctx)
+    const assignment = await ctx.db
+      .query('carrierAssignments')
+      .withIndex('by_organization_carrier', query =>
+        query.eq('organizationId', carrier.organizationId).eq('carrierId', args.carrierId))
+      .unique()
+    assertCarrierReadAccess(
+      membership,
+      assignment,
+      identityText(identity, 'email'),
+      await linkedCallingAgentIds(ctx, carrier.organizationId, membership.userId),
+    )
     return await enrichCarrier(ctx, args.carrierId)
   },
 })

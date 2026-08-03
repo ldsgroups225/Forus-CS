@@ -34,17 +34,11 @@ export const assign = mutation({
       .withIndex('by_organization_carrier', query =>
         query.eq('organizationId', carrier.organizationId).eq('carrierId', args.carrierId))
       .unique()
-    const currentAssignments = await ctx.db
-      .query('carrierAssignments')
-      .withIndex('by_organization_agent', query =>
-        query.eq('organizationId', carrier.organizationId).eq('agentId', args.agentId))
-      .collect()
-    if (!existing && currentAssignments.length >= 100)
-      throw new Error('PORTFOLIO_CAPACITY_REACHED')
     const now = Date.now()
     if (existing) {
       await ctx.db.patch(existing._id, {
         agentId: args.agentId,
+        callingAgentId: undefined,
         assignedAt: now,
         assignedBy: userId,
       })
@@ -99,6 +93,66 @@ export const unassign = mutation({
       entityId: args.carrierId,
       action: 'UNASSIGN',
       previousValue: { agentId: existing?.agentId },
+    })
+
+    return args.carrierId
+  },
+})
+
+export const assignToCallingAgent = mutation({
+  args: {
+    carrierId: v.id('carriers'),
+    callingAgentId: v.id('callingAgents'),
+  },
+  handler: async (ctx, args) => {
+    const { userId } = await requireAuthenticatedUser(ctx)
+    const carrier = await ctx.db.get(args.carrierId)
+    if (!carrier)
+      throw new Error('CARRIER_NOT_FOUND')
+
+    await requireRole(ctx, carrier.organizationId, assignmentRoles)
+    const callingAgent = await ctx.db.get(args.callingAgentId)
+    if (
+      !callingAgent
+      || !callingAgent.isActive
+      || callingAgent.organizationId !== carrier.organizationId
+    ) {
+      throw new Error('CALLING_AGENT_INVALID')
+    }
+
+    const existing = await ctx.db
+      .query('carrierAssignments')
+      .withIndex('by_organization_carrier', query =>
+        query.eq('organizationId', carrier.organizationId).eq('carrierId', args.carrierId))
+      .unique()
+    const now = Date.now()
+    if (existing) {
+      await ctx.db.patch(existing._id, {
+        agentId: callingAgent.linkedUserId,
+        callingAgentId: args.callingAgentId,
+        assignedAt: now,
+        assignedBy: userId,
+      })
+    }
+    else {
+      await ctx.db.insert('carrierAssignments', {
+        organizationId: carrier.organizationId,
+        carrierId: args.carrierId,
+        agentId: callingAgent.linkedUserId,
+        callingAgentId: args.callingAgentId,
+        assignedAt: now,
+        assignedBy: userId,
+      })
+    }
+
+    await writeAuditLog(ctx, {
+      organizationId: carrier.organizationId,
+      actorId: userId,
+      entityType: 'carrierAssignment',
+      entityId: args.carrierId,
+      action: 'ASSIGN_CALLING_AGENT',
+      previousValue: { agentId: existing?.agentId, callingAgentId: existing?.callingAgentId },
+      newValue: { callingAgentId: args.callingAgentId },
     })
 
     return args.carrierId

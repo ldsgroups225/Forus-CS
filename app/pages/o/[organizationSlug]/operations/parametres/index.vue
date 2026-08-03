@@ -2,12 +2,14 @@
 import type { OrganizationRole } from '~~/shared/domain'
 import type { Id } from '../../../../../../convex/_generated/dataModel'
 import { invitationStatusLabels, roleLabels } from '~~/shared/domain'
+import { buildInvitationUrl } from '~~/shared/invitations'
 import { formatCurrency, formatDateTime } from '~/utils/formatters'
 import { api } from '../../../../../../convex/_generated/api'
 
 definePageMeta({ layout: 'operations' })
 
 const { $convex } = useNuxtApp()
+const runtimeConfig = useRuntimeConfig()
 const { organization } = useCurrentOrganization()
 const organizationArgs = computed(() => organization.value
   ? { organizationId: organization.value._id }
@@ -20,6 +22,10 @@ const { data: members } = useConvexQuery(api.memberships.list, computed(() =>
   organization.value && canSeeTeam.value
     ? { organizationId: organization.value._id }
     : null))
+const { data: callingAgents } = useConvexQuery(api.callingAgents.list, computed(() =>
+  organization.value && canSeeTeam.value
+    ? { organizationId: organization.value._id }
+    : null))
 const { data: invitations } = useConvexQuery(api.invitations.list, computed(() =>
   organization.value && canAdmin.value
     ? { organizationId: organization.value._id }
@@ -27,7 +33,9 @@ const { data: invitations } = useConvexQuery(api.invitations.list, computed(() =
 const saving = shallowRef(false)
 const feedback = shallowRef('')
 const inviteOpen = shallowRef(false)
+const callingAgentName = shallowRef('')
 const invitationLink = shallowRef('')
+const copiedInvitationId = shallowRef('')
 const settingsForm = reactive({
   name: '',
   timezone: 'Africa/Abidjan',
@@ -52,6 +60,40 @@ const supervisorOptions = computed(() => [
       label: member.displayName ?? member.email ?? member.userId,
     })),
 ])
+const agentLinkOptions = computed(() => [
+  { value: '', label: 'Aucun compte lié' },
+  ...(members.value ?? [])
+    .filter(member => member.isActive && member.role === 'AGENT')
+    .map(member => ({
+      value: member.userId,
+      label: member.displayName ?? member.email ?? member.userId,
+    })),
+])
+
+function invitationUrl(code: string) {
+  return buildInvitationUrl(
+    runtimeConfig.public.siteUrl,
+    import.meta.client ? window.location.origin : undefined,
+    code,
+  )
+}
+
+async function writeClipboard(text: string) {
+  if (navigator.clipboard?.writeText) {
+    await navigator.clipboard.writeText(text)
+    return
+  }
+
+  const textarea = document.createElement('textarea')
+  textarea.value = text
+  textarea.setAttribute('readonly', '')
+  textarea.style.position = 'fixed'
+  textarea.style.left = '-9999px'
+  document.body.appendChild(textarea)
+  textarea.select()
+  document.execCommand('copy')
+  document.body.removeChild(textarea)
+}
 
 watch(
   [organization, settings],
@@ -105,7 +147,7 @@ async function createInvitation() {
       email: inviteForm.email,
       role: inviteForm.role,
     })
-    invitationLink.value = `${window.location.origin}/invite/${result.code}`
+    invitationLink.value = invitationUrl(result.code)
     feedback.value = 'Invitation créée. Copiez le lien sécurisé pour l’envoyer au membre.'
   }
   catch {
@@ -117,7 +159,13 @@ async function createInvitation() {
 }
 
 async function copyInvitation() {
-  await navigator.clipboard.writeText(invitationLink.value)
+  await writeClipboard(invitationLink.value)
+  feedback.value = 'Lien d’invitation copié.'
+}
+
+async function copyInvitationLink(invitationId: string, code: string) {
+  await writeClipboard(invitationUrl(code))
+  copiedInvitationId.value = invitationId
   feedback.value = 'Lien d’invitation copié.'
 }
 
@@ -159,6 +207,40 @@ async function assignSupervisor(membershipId: Id<'memberships'>, supervisorId?: 
   }
   catch {
     feedback.value = 'Superviseur invalide.'
+  }
+}
+
+async function createCallingAgent() {
+  if (!organization.value || !callingAgentName.value.trim())
+    return
+
+  saving.value = true
+  try {
+    await $convex.mutation(api.callingAgents.create, {
+      organizationId: organization.value._id,
+      name: callingAgentName.value,
+    })
+    callingAgentName.value = ''
+    feedback.value = 'Agent calling créé.'
+  }
+  catch {
+    feedback.value = 'Création de l’agent calling impossible.'
+  }
+  finally {
+    saving.value = false
+  }
+}
+
+async function linkCallingAgent(callingAgentId: Id<'callingAgents'>, userId?: string) {
+  try {
+    await $convex.mutation(api.callingAgents.linkUser, {
+      callingAgentId,
+      userId: userId || undefined,
+    })
+    feedback.value = 'Liaison agent mise à jour.'
+  }
+  catch {
+    feedback.value = 'Liaison impossible : choisissez un membre actif avec le rôle Agent.'
   }
 }
 
@@ -292,6 +374,52 @@ async function revokeInvitation(invitationId: Id<'invitations'>) {
         </div>
       </AppCard>
 
+      <AppCard v-if="canSeeTeam">
+        <div class="mb-5 flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
+          <div>
+            <h2 class="text-base font-900 m-0">
+              Agents calling
+            </h2>
+            <p class="text-xs text-[var(--color-text-muted)] m-0 mt-1">
+              Chaque enveloppe porte un portefeuille; un compte réel peut être lié après invitation.
+            </p>
+          </div>
+          <form v-if="canAdmin" class="gap-2 grid sm:grid-cols-[minmax(12rem,18rem)_auto]" @submit.prevent="createCallingAgent">
+            <AppInput v-model="callingAgentName" placeholder="Agent 1" :disabled="saving" />
+            <AppButton type="submit" size="sm" :loading="saving">
+              Créer
+            </AppButton>
+          </form>
+        </div>
+        <p v-if="!callingAgents?.length" class="text-sm text-[var(--color-text-muted)] m-0">
+          Aucun agent calling créé.
+        </p>
+        <div v-else class="gap-3 grid lg:grid-cols-2">
+          <div v-for="agent in callingAgents" :key="agent._id" class="p-3 border border-[var(--color-border)] rounded-xl bg-[var(--color-bg-deep)]">
+            <div class="mb-3 flex gap-3 items-start justify-between">
+              <div>
+                <strong>{{ agent.name }}</strong>
+                <span class="text-xs text-[var(--color-text-muted)] mt-1 block">
+                  {{ agent.assignedCarrierCount }} transporteurs
+                </span>
+              </div>
+              <AppBadge :tone="agent.linkedUserName || agent.linkedUserEmail ? 'success' : 'warning'">
+                {{ agent.linkedUserName || agent.linkedUserEmail ? 'Lié' : 'Enveloppe' }}
+              </AppBadge>
+            </div>
+            <AppSelect
+              v-if="canAdmin"
+              :model-value="agent.linkedUserId || ''"
+              :options="agentLinkOptions"
+              @update:model-value="linkCallingAgent(agent._id, $event)"
+            />
+            <p v-else class="text-xs text-[var(--color-text-muted)] m-0">
+              {{ agent.linkedUserName || agent.linkedUserEmail || 'Compte réel non lié' }}
+            </p>
+          </div>
+        </div>
+      </AppCard>
+
       <AppCard v-if="canAdmin">
         <h2 class="text-base font-900 m-0">
           Invitations
@@ -300,12 +428,29 @@ async function revokeInvitation(invitationId: Id<'invitations'>) {
           Aucune invitation créée.
         </p>
         <div v-else class="mt-4 space-y-2">
-          <div v-for="invitation in invitations" :key="invitation._id" class="text-sm p-3 rounded-xl bg-[var(--color-bg-deep)] flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-            <div><strong>{{ invitation.email }}</strong><span class="text-xs text-[var(--color-text-muted)] mt-1 block">{{ roleLabels[invitation.role] }} · expire {{ formatDateTime(invitation.expiresAt) }}</span></div>
-            <div class="flex gap-2 items-center">
-              <AppBadge :tone="invitation.effectiveStatus === 'PENDING' ? 'warning' : invitation.effectiveStatus === 'ACCEPTED' ? 'success' : 'neutral'">
-                {{ invitationStatusLabels[invitation.effectiveStatus] }}
-              </AppBadge><AppButton v-if="invitation.effectiveStatus === 'PENDING'" size="sm" variant="ghost" @click="revokeInvitation(invitation._id)">
+          <div v-for="invitation in invitations" :key="invitation._id" class="text-sm p-3 rounded-xl bg-[var(--color-bg-deep)] flex flex-col gap-3">
+            <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+              <div>
+                <strong>{{ invitation.email }}</strong>
+                <span class="text-xs text-[var(--color-text-muted)] mt-1 block">{{ roleLabels[invitation.role] }} · expire {{ formatDateTime(invitation.expiresAt) }}</span>
+              </div>
+              <div class="flex gap-2 items-center">
+                <AppBadge :tone="invitation.effectiveStatus === 'PENDING' ? 'warning' : invitation.effectiveStatus === 'ACCEPTED' ? 'success' : 'neutral'">
+                  {{ invitationStatusLabels[invitation.effectiveStatus] }}
+                </AppBadge>
+              </div>
+            </div>
+            <div v-if="invitation.effectiveStatus === 'PENDING'" class="gap-2 grid sm:grid-cols-[minmax(0,1fr)_auto_auto] sm:items-center">
+              <p class="text-xs text-[var(--color-text-muted)] m-0 px-3 py-2 border border-[var(--color-border)] rounded-xl bg-[var(--color-surface)] break-all">
+                {{ invitationUrl(invitation.code) }}
+              </p>
+              <AppButton size="sm" variant="secondary" @click="copyInvitationLink(invitation._id, invitation.code)">
+                <template #leading>
+                  <span class="i-carbon-copy" />
+                </template>
+                {{ copiedInvitationId === invitation._id ? 'Copié' : 'Copier' }}
+              </AppButton>
+              <AppButton size="sm" variant="ghost" @click="revokeInvitation(invitation._id)">
                 Révoquer
               </AppButton>
             </div>

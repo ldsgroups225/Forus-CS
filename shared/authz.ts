@@ -5,6 +5,7 @@ export interface MembershipAccess {
   userId: string
   role: OrganizationRole
   isActive: boolean
+  email?: string
 }
 
 export function assertMembershipAccess(

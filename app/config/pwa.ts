@@ -42,7 +42,7 @@ export const pwa: ModuleOptions = {
     skipWaiting: true,
     clientsClaim: true,
     globPatterns: ['**/*.{js,css,html,txt,png,ico,svg}'],
-    navigateFallbackDenylist: [/^\/api\//],
+    navigateFallbackDenylist: [/^\/api\//, /^\/invite\//],
     navigateFallback: '/offline',
     cleanupOutdatedCaches: true,
     runtimeCaching: [
@@ -61,7 +61,7 @@ export const pwa: ModuleOptions = {
         },
       },
       {
-        urlPattern: ({ request }) => request.mode === 'navigate',
+        urlPattern: ({ request, url }) => request.mode === 'navigate' && !url.pathname.startsWith('/invite/'),
         handler: 'NetworkFirst',
         options: {
           cacheName: 'forus-pages',

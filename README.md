@@ -141,6 +141,31 @@ options, missions, incidents, matching et KPI. Playwright vérifie l’App Shell
 les vues desktop/mobile, la PWA et, lorsque les secrets E2E sont configurés, le
 parcours Responsable Opérations sur un vrai backend.
 
+Le parcours Calling multi-rôles est volontairement isolé des E2E ordinaires : il
+crée ses propres client, transporteur, deux véhicules et besoin, puis vérifie
+`Agent → Superviseur → Opérations`, y compris l’acceptation d’un sous-ensemble
+des véhicules. Les trois comptes doivent déjà être membres actifs de la même
+organisation ; le compte administrateur doit pouvoir créer les données de test.
+
+```bash
+E2E_CALLING_FULL=true \
+E2E_BASE_URL=https://forus-cs.vercel.app \
+E2E_ADMIN_EMAIL=admin@example.com E2E_ADMIN_PASSWORD='…' \
+E2E_SUPERVISOR_EMAIL=supervisor@example.com E2E_SUPERVISOR_PASSWORD='…' \
+E2E_AGENT_EMAIL=agent@example.com E2E_AGENT_PASSWORD='…' E2E_AGENT_LABEL='Nom affiché de l’agent' \
+pnpm exec playwright test e2e/calling-workflow.spec.ts --project=desktop-chromium
+```
+
+Les variables restent dans le gestionnaire de secrets local ou CI ; elles ne
+doivent jamais être enregistrées dans un fichier versionné.
+
+Pour une recette isolée, `E2E_CALLING_BOOTSTRAP=true` crée des comptes
+temporaires, une organisation et les invitations nécessaires dans le
+déploiement Convex de développement. Quand l’authentification Convex ne
+reconnaît que l’origine Vercel, lancez-la avec
+`E2E_BASE_URL=https://forus-cs.vercel.app`. Ne l’utilisez ni contre une base de
+données métier, ni contre le déploiement Convex de production.
+
 ## Hors ligne
 
 Le service worker met en cache l’App Shell et les navigations déjà chargées.

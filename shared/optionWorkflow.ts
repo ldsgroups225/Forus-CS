@@ -45,3 +45,8 @@ export function applyOptionAcceptance(
 export function canDecideValidatedOption(status: CarrierOptionStatus): boolean {
   return status === 'VALIDATED'
 }
+
+/** A supervisor may send an unreviewed or validated return back for correction. */
+export function canReviewOption(status: CarrierOptionStatus): boolean {
+  return status === 'PENDING' || status === 'VALIDATED'
+}

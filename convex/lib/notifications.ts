@@ -8,12 +8,24 @@ interface NotificationInput {
   title: string
   body: string
   href?: string
+  deduplicationKey?: string
 }
 
 export async function createNotification(
   ctx: MutationCtx,
   input: NotificationInput,
 ) {
+  if (input.deduplicationKey) {
+    const existing = await ctx.db
+      .query('notifications')
+      .withIndex('by_organization_user_deduplication', query => query
+        .eq('organizationId', input.organizationId)
+        .eq('userId', input.userId)
+        .eq('deduplicationKey', input.deduplicationKey))
+      .unique()
+    if (existing)
+      return existing._id
+  }
   return await ctx.db.insert('notifications', {
     ...input,
     isRead: false,
@@ -47,6 +59,9 @@ export async function notifyOrganizationRoles(
         title: input.title,
         body: input.body,
         href: input.href,
+        deduplicationKey: input.deduplicationKey
+          ? `${input.deduplicationKey}:${membership.userId}`
+          : undefined,
       })),
   )
 }

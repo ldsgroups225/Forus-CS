@@ -16,6 +16,19 @@ export async function requireCarrierWriteAccess(
   if (canViewAllCarriers(membership))
     return membership
 
+  if (!await hasAssignedCarrierAccess(ctx, organizationId, carrierId, membership.userId))
+    throw new Error('CARRIER_WRITE_ACCESS_DENIED')
+
+  return membership
+}
+
+/** One portfolio rule for all agent actions: direct assignment or Calling envelope. */
+export async function hasAssignedCarrierAccess(
+  ctx: Pick<QueryCtx, 'db'> | Pick<MutationCtx, 'db'>,
+  organizationId: Id<'organizations'>,
+  carrierId: Id<'carriers'>,
+  userId: string,
+) {
   const assignment = await ctx.db
     .query('carrierAssignments')
     .withIndex('by_organization_carrier', query =>
@@ -25,19 +38,15 @@ export async function requireCarrierWriteAccess(
   const linkedCallingAgents = await ctx.db
     .query('callingAgents')
     .withIndex('by_organization_linked_user', query =>
-      query.eq('organizationId', organizationId).eq('linkedUserId', membership.userId))
+      query.eq('organizationId', organizationId).eq('linkedUserId', userId))
     .collect()
   const linkedCallingAgentIds = new Set(linkedCallingAgents.map(callingAgent => callingAgent._id))
 
-  if (
-    !assignment
-    || (
-      assignment.agentId !== membership.userId
-      && (!assignment.callingAgentId || !linkedCallingAgentIds.has(assignment.callingAgentId))
-    )
-  ) {
-    throw new Error('CARRIER_WRITE_ACCESS_DENIED')
-  }
-
-  return membership
+  return Boolean(
+    assignment
+    && (
+      assignment.agentId === userId
+      || (assignment.callingAgentId && linkedCallingAgentIds.has(assignment.callingAgentId))
+    ),
+  )
 }

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { applyOptionAcceptance, canDecideValidatedOption } from '../shared/optionWorkflow'
+import { applyOptionAcceptance, canDecideValidatedOption, canReviewOption } from '../shared/optionWorkflow'
 
 describe('applyOptionAcceptance', () => {
   it('crée une progression partielle sans dépasser la proposition', () => {
@@ -45,5 +45,15 @@ describe('canDecideValidatedOption', () => {
     expect(canDecideValidatedOption('NEGOTIATION')).toBe(false)
     expect(canDecideValidatedOption('ACCEPTED')).toBe(false)
     expect(canDecideValidatedOption('REFUSED')).toBe(false)
+  })
+})
+
+describe('canReviewOption', () => {
+  it('autorise le superviseur à négocier ou rejeter avant ou après validation', () => {
+    expect(canReviewOption('PENDING')).toBe(true)
+    expect(canReviewOption('VALIDATED')).toBe(true)
+    expect(canReviewOption('NEGOTIATION')).toBe(false)
+    expect(canReviewOption('ACCEPTED')).toBe(false)
+    expect(canReviewOption('REFUSED')).toBe(false)
   })
 })

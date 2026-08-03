@@ -1,7 +1,7 @@
 import { v } from 'convex/values'
 import { mutation, query } from './_generated/server'
 import { writeAuditLog } from './lib/audit'
-import { requireAuthenticatedUser, requireOrganizationAccess } from './lib/authz'
+import { requireAuthenticatedUser } from './lib/authz'
 import { requireCarrierWriteAccess } from './lib/carrierAuthz'
 
 const availabilityStatus = v.union(
@@ -74,7 +74,7 @@ export const listDocuments = query({
     if (!carrier)
       return []
 
-    await requireOrganizationAccess(ctx, carrier.organizationId)
+    await requireCarrierWriteAccess(ctx, carrier.organizationId, args.carrierId)
     return await ctx.db
       .query('carrierDocuments')
       .withIndex('by_carrier', query => query.eq('carrierId', args.carrierId))
@@ -156,7 +156,7 @@ export const listAvailabilities = query({
     if (!carrier)
       return []
 
-    await requireOrganizationAccess(ctx, carrier.organizationId)
+    await requireCarrierWriteAccess(ctx, carrier.organizationId, args.carrierId)
     return await ctx.db
       .query('carrierAvailabilities')
       .withIndex('by_carrier', query => query.eq('carrierId', args.carrierId))

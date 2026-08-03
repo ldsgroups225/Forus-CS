@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { nextTick, useTemplateRef, watch } from 'vue'
+import { nextTick, shallowRef, useTemplateRef, watch } from 'vue'
 
 defineProps<{
   title: string
@@ -8,10 +8,47 @@ defineProps<{
 
 const open = defineModel<boolean>({ default: false })
 const dialogRef = useTemplateRef<HTMLElement>('dialog')
+const previouslyFocused = shallowRef<HTMLElement | null>(null)
+
+function focusableElements() {
+  return Array.from(dialogRef.value?.querySelectorAll<HTMLElement>([
+    'a[href]',
+    'button:not([disabled])',
+    'input:not([disabled])',
+    'select:not([disabled])',
+    'textarea:not([disabled])',
+    '[tabindex]:not([tabindex="-1"])',
+  ].join(',')) ?? []).filter(element => !element.hasAttribute('hidden'))
+}
+
+function trapFocus(event: KeyboardEvent) {
+  const focusable = focusableElements()
+  const first = focusable.at(0)
+  const last = focusable.at(-1)
+  if (!first || !last)
+    return
+
+  const active = document.activeElement
+  if (event.shiftKey && (active === first || active === dialogRef.value)) {
+    event.preventDefault()
+    last.focus()
+  }
+  else if (!event.shiftKey && active === last) {
+    event.preventDefault()
+    first.focus()
+  }
+}
 
 watch(open, async (isOpen) => {
-  if (!isOpen)
+  if (!isOpen) {
+    await nextTick()
+    previouslyFocused.value?.focus()
+    previouslyFocused.value = null
     return
+  }
+  previouslyFocused.value = document.activeElement instanceof HTMLElement
+    ? document.activeElement
+    : null
   await nextTick()
   dialogRef.value?.focus()
 })
@@ -43,6 +80,7 @@ function close() {
           :aria-label="title"
           tabindex="-1"
           @keydown.esc.stop="close"
+          @keydown.tab="trapFocus"
         >
           <header class="mb-5 flex gap-4 items-start justify-between">
             <div>

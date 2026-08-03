@@ -5,20 +5,23 @@ const organizationSlug = computed(() => {
   const params = route.params as Record<string, string | string[] | undefined>
   return typeof params.organizationSlug === 'string' ? params.organizationSlug : ''
 })
+const { organization } = useCurrentOrganization()
 
 const base = computed(() => `/o/${organizationSlug.value}/operations`)
 
-const navigation = computed(() => [
-  { label: 'Dashboard', icon: 'i-carbon-dashboard', to: base.value, exact: true },
-  { label: 'Besoins', icon: 'i-carbon-task', to: `${base.value}/needs` },
-  { label: 'Options', icon: 'i-carbon-list-checked', to: `${base.value}/options` },
-  { label: 'Missions', icon: 'i-carbon-delivery', to: `${base.value}/missions` },
-  { label: 'Incidents', icon: 'i-carbon-warning-alt', to: `${base.value}/incidents` },
-  { label: 'Clients', icon: 'i-carbon-enterprise', to: `${base.value}/clients` },
-  { label: 'Transporteurs', icon: 'i-carbon-delivery-truck', to: `${base.value}/transporteurs` },
-  { label: 'Rapports', icon: 'i-carbon-chart-column', to: `${base.value}/rapports` },
-  { label: 'Paramètres', icon: 'i-carbon-settings', to: `${base.value}/parametres` },
-])
+const navigation = computed(() => organization.value?.role === 'AGENT'
+  ? [{ label: 'Calling', icon: 'i-carbon-phone-filled', to: `${base.value}/calling`, exact: true }]
+  : [
+      { label: 'Dashboard', icon: 'i-carbon-dashboard', to: base.value, exact: true },
+      { label: 'Besoins', icon: 'i-carbon-task', to: `${base.value}/needs` },
+      { label: 'Options', icon: 'i-carbon-list-checked', to: `${base.value}/options` },
+      { label: 'Missions', icon: 'i-carbon-delivery', to: `${base.value}/missions` },
+      { label: 'Incidents', icon: 'i-carbon-warning-alt', to: `${base.value}/incidents` },
+      { label: 'Clients', icon: 'i-carbon-enterprise', to: `${base.value}/clients` },
+      { label: 'Transporteurs', icon: 'i-carbon-delivery-truck', to: `${base.value}/transporteurs` },
+      { label: 'Rapports', icon: 'i-carbon-chart-column', to: `${base.value}/rapports` },
+      { label: 'Paramètres', icon: 'i-carbon-settings', to: `${base.value}/parametres` },
+    ])
 
 function isActive(item: { to: string, exact?: boolean }) {
   return item.exact ? route.path === item.to : route.path.startsWith(item.to)

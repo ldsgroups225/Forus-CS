@@ -1,11 +1,13 @@
 <script setup lang="ts">
 const route = useRoute()
+const { organization } = useCurrentOrganization()
 const moreOpen = shallowRef(false)
 const slug = computed(() => {
   const params = route.params as Record<string, string | string[] | undefined>
   return typeof params.organizationSlug === 'string' ? params.organizationSlug : ''
 })
 const base = computed(() => `/o/${slug.value}/operations`)
+const isAgent = computed(() => organization.value?.role === 'AGENT')
 const items = computed(() => [
   { label: 'Accueil', icon: 'i-carbon-home', to: base.value },
   { label: 'Besoins', icon: 'i-carbon-task', to: `${base.value}/needs` },
@@ -23,7 +25,7 @@ const moreItems = computed(() => [
 </script>
 
 <template>
-  <div v-if="moreOpen" class="p-4 pb-24 border-t border-[var(--color-border)] bg-[var(--color-bg-deep)] inset-x-0 bottom-0 fixed z-49 lg:hidden">
+  <div v-if="moreOpen && !isAgent" class="p-4 pb-24 border-t border-[var(--color-border)] bg-[var(--color-bg-deep)] inset-x-0 bottom-0 fixed z-49 lg:hidden">
     <div class="mb-3 flex items-center justify-between">
       <strong class="text-sm">Navigation</strong>
       <button type="button" class="icon-btn" aria-label="Fermer la navigation" @click="moreOpen = false">
@@ -36,9 +38,24 @@ const moreItems = computed(() => [
       </NuxtLink>
     </div>
   </div>
-  <nav class="px-2 pb-[env(safe-area-inset-bottom)] border-t border-[var(--color-border)] bg-[var(--color-bg-deep)]/98 grid grid-cols-5 h-18 inset-x-0 bottom-0 fixed z-50 lg:hidden" aria-label="Navigation mobile">
+  <nav
+    class="px-2 pb-[env(safe-area-inset-bottom)] border-t border-[var(--color-border)] bg-[var(--color-bg-deep)]/98 grid h-18 inset-x-0 bottom-0 fixed z-50 lg:hidden"
+    :class="[isAgent ? 'grid-cols-2 gap-2' : 'grid-cols-5', isAgent && 'agent-mobile-nav']"
+    aria-label="Navigation mobile"
+  >
+    <template v-if="isAgent">
+      <a href="#active-needs" class="agent-mobile-nav-item focus-ring">
+        <span class="i-carbon-task text-xl" aria-hidden="true" />
+        <span>Demandes</span>
+      </a>
+      <a href="#calling-contacts" class="agent-mobile-nav-item agent-mobile-nav-primary focus-ring">
+        <span class="i-carbon-phone-filled text-xl" aria-hidden="true" />
+        <span>Appeler</span>
+      </a>
+    </template>
     <NuxtLink
       v-for="item in items"
+      v-else
       :key="item.label"
       :to="item.to"
       class="text-[10px] font-700 rounded-xl flex flex-col gap-1 min-w-0 items-center justify-center relative focus-ring"
@@ -55,9 +72,34 @@ const moreItems = computed(() => [
       />
       <span :class="item.cta && '-translate-y-3'">{{ item.label }}</span>
     </NuxtLink>
-    <button type="button" class="text-[10px] text-[var(--color-text-subtle)] font-700 rounded-xl flex flex-col gap-1 items-center justify-center focus-ring" :aria-expanded="moreOpen" @click="moreOpen = !moreOpen">
+    <button v-if="!isAgent" type="button" class="text-[10px] text-[var(--color-text-subtle)] font-700 rounded-xl flex flex-col gap-1 items-center justify-center focus-ring" :aria-expanded="moreOpen" @click="moreOpen = !moreOpen">
       <span class="i-carbon-apps text-xl" />
       <span>Plus</span>
     </button>
   </nav>
 </template>
+
+<style scoped>
+.agent-mobile-nav {
+  background: var(--color-bg-deep);
+  box-shadow: 0 -10px 24px rgb(4 11 20 / 14%);
+}
+
+.agent-mobile-nav-item {
+  margin: 0.45rem 0;
+  border-radius: 0.8rem;
+  color: var(--color-text-muted);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.2rem;
+  font-size: 0.68rem;
+  font-weight: 800;
+}
+.agent-mobile-nav-primary {
+  background: var(--color-accent);
+  color: var(--color-button-text);
+  box-shadow: 0 6px 18px rgb(32 199 183 / 22%);
+}
+</style>

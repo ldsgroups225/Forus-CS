@@ -12,10 +12,17 @@ const currentSlug = computed(() => {
   return typeof params.organizationSlug === 'string' ? params.organizationSlug : ''
 })
 
+watch(currentSlug, (slug) => {
+  if (slug)
+    cacheOrganizationSlug(slug)
+}, { immediate: true })
+
 async function switchOrganization(event: Event) {
   const target = event.target as HTMLSelectElement
-  if (target.value)
+  if (target.value) {
+    cacheOrganizationSlug(target.value)
     await navigateTo(`/o/${target.value}/operations`)
+  }
 }
 </script>
 

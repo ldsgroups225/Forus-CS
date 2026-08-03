@@ -62,12 +62,14 @@ export default defineNuxtConfig({
   css: ['~/assets/css/main.css'],
 
   colorMode: {
-    preference: 'dark',
-    fallback: 'dark',
+    preference: 'system',
+    fallback: 'system',
     classSuffix: '',
   },
 
   runtimeConfig: {
+    // eslint-disable-next-line node/prefer-global/process
+    groqApiKey: process.env.NUXT_GROQ_API_KEY ?? '',
     public: publicEnv,
   },
 

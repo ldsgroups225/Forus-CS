@@ -71,7 +71,14 @@ export const pwa: ModuleOptions = {
       {
         urlPattern: ({ request, url }) =>
           request.mode === 'navigate'
-          && !navigationFallbackDenylist.some(pattern => pattern.test(url.pathname)),
+          && ![
+            /^\/api\//,
+            /^\/invite\//,
+            /^\/login$/,
+            /^\/register$/,
+            /^\/forgot-password$/,
+            /^\/reset-password$/,
+          ].some(pattern => pattern.test(url.pathname)),
         handler: 'NetworkFirst',
         options: {
           cacheName: 'forus-pages',

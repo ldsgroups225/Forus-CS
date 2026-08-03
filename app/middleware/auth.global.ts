@@ -6,6 +6,7 @@ const publicRoutes = new Set([
   '/forgot-password',
   '/reset-password',
   '/offline',
+  '/loading',
 ])
 
 export default defineNuxtRouteMiddleware(async (to) => {
@@ -27,7 +28,10 @@ export default defineNuxtRouteMiddleware(async (to) => {
     if (isPublic)
       return
 
-    return navigateTo({ path: '/offline', query: { redirect: to.fullPath } })
+    if (!navigator.onLine)
+      return navigateTo({ path: '/offline', query: { redirect: to.fullPath } })
+
+    return navigateTo({ path: '/loading', query: { redirect: to.fullPath } })
   }
 
   const isAuthenticated = Boolean(response.data?.user)
@@ -50,12 +54,16 @@ export default defineNuxtRouteMiddleware(async (to) => {
   const organizations = await $convex.query(api.organizations.listForCurrentUser, {})
 
   if (to.path === '/') {
-    const first = organizations[0]
+    const cachedSlug = getCachedOrganizationSlug()
+    const first = organizations.find(organization => organization.slug === cachedSlug)
+      ?? organizations[0]
     return navigateTo(first ? `/o/${first.slug}/operations` : '/onboarding/organization')
   }
 
   if (to.path === '/onboarding/organization') {
-    const first = organizations[0]
+    const cachedSlug = getCachedOrganizationSlug()
+    const first = organizations.find(organization => organization.slug === cachedSlug)
+      ?? organizations[0]
     if (first)
       return navigateTo(`/o/${first.slug}/operations`)
     return
@@ -71,4 +79,10 @@ export default defineNuxtRouteMiddleware(async (to) => {
 
   if (requestedSlug && !organizations.some(organization => organization.slug === requestedSlug))
     return navigateTo(`/o/${organizations[0]?.slug}/operations`)
+
+  const requestedOrganization = organizations.find(organization => organization.slug === requestedSlug)
+  if (requestedOrganization?.role === 'AGENT'
+    && to.path === `/o/${requestedSlug}/operations`) {
+    return navigateTo(`/o/${requestedSlug}/operations/calling`)
+  }
 })

@@ -308,6 +308,76 @@ export const list = query({
   },
 })
 
+export const listCallingQueue = query({
+  args: {
+    organizationId: v.id('organizations'),
+  },
+  handler: async (ctx, args) => {
+    const { membership } = await requireOrganizationAccess(ctx, args.organizationId)
+    if (membership.role !== 'AGENT')
+      throw new Error('CALLING_QUEUE_AGENT_ONLY')
+
+    const directAssignments = await ctx.db
+      .query('carrierAssignments')
+      .withIndex('by_organization_agent', query =>
+        query.eq('organizationId', args.organizationId).eq('agentId', membership.userId))
+      .collect()
+    const linkedAgents = await ctx.db
+      .query('callingAgents')
+      .withIndex('by_organization_linked_user', query =>
+        query.eq('organizationId', args.organizationId).eq('linkedUserId', membership.userId))
+      .collect()
+    const envelopeAssignments = await Promise.all(linkedAgents.map(agent =>
+      ctx.db
+        .query('carrierAssignments')
+        .withIndex('by_organization_calling_agent', query =>
+          query.eq('organizationId', args.organizationId).eq('callingAgentId', agent._id))
+        .collect()))
+    const carrierIds = [...new Set([
+      ...directAssignments.map(assignment => assignment.carrierId),
+      ...envelopeAssignments.flat().map(assignment => assignment.carrierId),
+    ])]
+    const pendingFollowUps = await ctx.db
+      .query('followUps')
+      .withIndex('by_assignee_due', query =>
+        query.eq('assignedTo', membership.userId).eq('status', 'PENDING'))
+      .collect()
+    const followUpByCarrier = new Map(pendingFollowUps
+      .filter(followUp => followUp.carrierId)
+      .map(followUp => [followUp.carrierId as string, followUp]))
+
+    const queue = await Promise.all(carrierIds.map(async (carrierId) => {
+      const carrier = await enrichCarrier(ctx, carrierId)
+      if (!carrier || !carrier.isActive || !carrier.phone)
+        return null
+      const lastCall = await ctx.db
+        .query('callLogs')
+        .withIndex('by_carrier', query => query.eq('carrierId', carrierId))
+        .order('desc')
+        .first()
+      const followUp = followUpByCarrier.get(carrierId)
+
+      return {
+        _id: carrier._id,
+        name: carrier.name,
+        contactName: carrier.contactName,
+        phone: carrier.phone,
+        truckTypes: carrier.truckTypes,
+        availableVehicleCount: carrier.availableVehicleCount,
+        activeVehicleCount: carrier.activeVehicleCount,
+        lastCall: lastCall
+          ? { outcome: lastCall.outcome, calledAt: lastCall.calledAt }
+          : undefined,
+        followUp: followUp
+          ? { _id: followUp._id, dueAt: followUp.dueAt, notes: followUp.notes }
+          : undefined,
+      }
+    }))
+
+    return queue.filter((carrier): carrier is NonNullable<typeof carrier> => carrier !== null)
+  },
+})
+
 export const getById = query({
   args: {
     carrierId: v.id('carriers'),

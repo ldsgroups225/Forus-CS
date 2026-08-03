@@ -59,6 +59,13 @@ export function formatPhoneNumber(value?: string) {
   return `+225 ${localDigits.replace(ciPhonePattern, '$1 $2 $3 $4 $5')}`
 }
 
+export function formatDisplayName(value?: string) {
+  return value?.trim()
+    .toLocaleLowerCase('fr')
+    .replace(/(^|[\s'-])(\p{L})/gu, (_, prefix: string, letter: string) =>
+      `${prefix}${letter.toLocaleUpperCase('fr')}`) ?? ''
+}
+
 export function buildPhoneUrl(value: string) {
   const phone = normalizePhoneNumberForLink(value)
   return phone ? `tel:+${phone}` : ''

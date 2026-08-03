@@ -3,6 +3,14 @@ import process from 'node:process'
 import { appDescription, appName } from '../constants/index'
 
 const scope = '/'
+export const navigationFallbackDenylist = [
+  /^\/api\//,
+  /^\/invite\//,
+  /^\/login$/,
+  /^\/register$/,
+  /^\/forgot-password$/,
+  /^\/reset-password$/,
+]
 
 export const pwa: ModuleOptions = {
   registerType: 'autoUpdate',
@@ -42,7 +50,7 @@ export const pwa: ModuleOptions = {
     skipWaiting: true,
     clientsClaim: true,
     globPatterns: ['**/*.{js,css,html,txt,png,ico,svg}'],
-    navigateFallbackDenylist: [/^\/api\//, /^\/invite\//],
+    navigateFallbackDenylist: navigationFallbackDenylist,
     navigateFallback: '/offline',
     cleanupOutdatedCaches: true,
     runtimeCaching: [
@@ -61,7 +69,9 @@ export const pwa: ModuleOptions = {
         },
       },
       {
-        urlPattern: ({ request, url }) => request.mode === 'navigate' && !url.pathname.startsWith('/invite/'),
+        urlPattern: ({ request, url }) =>
+          request.mode === 'navigate'
+          && !navigationFallbackDenylist.some(pattern => pattern.test(url.pathname)),
         handler: 'NetworkFirst',
         options: {
           cacheName: 'forus-pages',

@@ -1,5 +1,6 @@
 import type { FunctionReference } from 'convex/server'
 import type { OfflineMutationIntent } from '~/lib/offline-mutation-queue'
+import { getOfflineOwnerId } from '~/lib/offline-access'
 import { offlineMutationQueue } from '~/lib/offline-mutation-queue'
 import { api } from '../../convex/_generated/api'
 
@@ -13,10 +14,15 @@ const mutations = {
 
 export default defineNuxtPlugin((nuxtApp) => {
   const pendingCount = useState('offline-mutation-count', () => 0)
+  const session = nuxtApp.$authClient.useSession()
   let flushing = false
 
+  function ownerId() {
+    return session.value.data?.user?.id ?? getOfflineOwnerId()
+  }
+
   async function refreshCount() {
-    pendingCount.value = (await offlineMutationQueue.list()).length
+    pendingCount.value = (await offlineMutationQueue.list(ownerId())).length
   }
 
   async function send(intent: OfflineMutationIntent) {
@@ -28,10 +34,13 @@ export default defineNuxtPlugin((nuxtApp) => {
   async function flush() {
     if (flushing || !navigator.onLine)
       return
+    const currentOwnerId = ownerId()
+    if (!currentOwnerId)
+      return
     flushing = true
     try {
       if (await nuxtApp.$ensureConvexAuth())
-        await offlineMutationQueue.flush(send)
+        await offlineMutationQueue.flush(currentOwnerId, send)
     }
     finally {
       flushing = false

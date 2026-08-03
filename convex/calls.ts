@@ -6,6 +6,7 @@ import { writeAuditLog } from './lib/audit'
 import { requireAuthenticatedUser, requireOrganizationAccess } from './lib/authz'
 import { findIdempotentResult, recordIdempotentResult } from './lib/idempotency'
 import { createNotification } from './lib/notifications'
+import { insertCallIntoReports } from './lib/reportAggregates'
 
 const callOutcome = v.union(
   v.literal('AVAILABLE'),
@@ -72,6 +73,9 @@ export const log = mutation({
       createdBy: userId,
       idempotencyKey: args.idempotencyKey,
     })
+    const callLog = await ctx.db.get(callLogId)
+    if (callLog)
+      await insertCallIntoReports(ctx, callLog)
     await recordIdempotentResult(ctx, {
       organizationId: args.organizationId,
       key: args.idempotencyKey,

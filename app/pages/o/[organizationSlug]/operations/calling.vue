@@ -3,7 +3,7 @@ import type { CallOutcome } from '~~/shared/domain'
 import type { Id } from '../../../../../convex/_generated/dataModel'
 import { callOutcomeLabels, needUrgencyLabels } from '~~/shared/domain'
 import { getCallingTruckTypeOptions, matchesCallingTruckTypeFilter } from '~/utils/calling-truck-types'
-import { formatDateTime, formatDisplayName, formatPhoneNumber } from '~/utils/formatters'
+import { buildPhoneUrl, formatDateTime, formatDisplayName, formatPhoneNumber } from '~/utils/formatters'
 import { buildWhatsAppUrl } from '~/utils/need-contact'
 import { api } from '../../../../../convex/_generated/api'
 
@@ -11,6 +11,7 @@ definePageMeta({ layout: 'operations' })
 
 const { $convex } = useNuxtApp()
 const { enqueue } = useOfflineMutationQueue()
+const { enqueue: enqueueAudio } = useAudioTranscription()
 const { organization } = useCurrentOrganization()
 const queueArgs = computed(() => organization.value ? { organizationId: organization.value._id } : null)
 const { data: queue, isPending, error } = useConvexQuery(api.carriers.listCallingQueue, queueArgs)
@@ -20,6 +21,7 @@ const selectedTruckTypes = shallowRef<string[]>([])
 const expandedCarrierId = shallowRef<string | null>(null)
 const expandedNeedId = shallowRef<string | null>(null)
 const selectedCarrier = shallowRef<NonNullable<typeof queue.value>[number] | null>(null)
+const pendingCallCarrier = shallowRef<NonNullable<typeof queue.value>[number] | null>(null)
 const resultModalOpen = computed({
   get: () => selectedCarrier.value !== null,
   set: (open: boolean) => {
@@ -38,6 +40,8 @@ const isTranscribing = shallowRef(false)
 const recorder = shallowRef<MediaRecorder | null>(null)
 const recorderStream = shallowRef<MediaStream | null>(null)
 const audioChunks: Blob[] = []
+const audioIntentId = shallowRef('')
+const { start: startPostCallRecap } = usePostCallRecap({ onReturn: openPostCallRecap })
 
 const outcomeOptions = Object.entries(callOutcomeLabels).map(([value, label]) => ({ value, label }))
 const truckTypeOptions = computed(() => getCallingTruckTypeOptions(queue.value ?? []))
@@ -54,12 +58,32 @@ const filteredQueue = computed(() => {
 const followUps = computed(() => filteredQueue.value.filter(carrier => carrier.followUp))
 const visibleNeeds = computed(() => (activeNeeds.value ?? []).slice(0, 3))
 
-function openCall(carrier: NonNullable<typeof queue.value>[number]) {
-  selectedCarrier.value = carrier
+function resetCallResult() {
   outcome.value = 'AVAILABLE'
   notes.value = ''
   calledAt.value = Date.now()
   feedback.value = ''
+}
+
+function startQuickDial(carrier: NonNullable<typeof queue.value>[number]) {
+  selectedCarrier.value = null
+  pendingCallCarrier.value = carrier
+  resetCallResult()
+  startPostCallRecap()
+}
+
+function openManualCallRecap(carrier: NonNullable<typeof queue.value>[number]) {
+  pendingCallCarrier.value = null
+  resetCallResult()
+  selectedCarrier.value = carrier
+}
+
+function openPostCallRecap() {
+  if (!pendingCallCarrier.value)
+    return
+
+  selectedCarrier.value = pendingCallCarrier.value
+  pendingCallCarrier.value = null
 }
 
 function toggleCarrierDetails(carrierId: string) {
@@ -146,22 +170,12 @@ async function toggleRecording() {
       if (!audio.size)
         return
       isTranscribing.value = true
-      feedback.value = 'Transcription en cours…'
+      feedback.value = 'Note audio conservée. Transcription en attente…'
       try {
-        const authResponse = await useAuth().authClient.convex.token()
-        const token = authResponse.data?.token
-        if (!token)
-          throw new Error('AUTH_TOKEN_MISSING')
-        const formData = new FormData()
-        formData.append('file', audio, `calling-note.${audio.type.includes('mp4') ? 'mp4' : 'webm'}`)
-        const transcription = await $fetch<{ text: string }>('/api/ai/transcribe', {
-          method: 'POST',
-          headers: { Authorization: `Bearer ${token}` },
-          body: formData,
-        })
-        if (transcription.text)
-          notes.value = [notes.value.trim(), transcription.text].filter(Boolean).join('\n')
-        feedback.value = transcription.text ? 'Transcription ajoutée à la note.' : 'Aucun texte détecté dans l’enregistrement.'
+        audioIntentId.value = await enqueueAudio(organization.value!._id, audio)
+        feedback.value = navigator.onLine
+          ? 'Transcription lancée. Vous pouvez continuer à rédiger.'
+          : 'Audio conservé hors ligne. Il sera transcrit dès le retour du réseau.'
       }
       catch {
         feedback.value = 'Impossible de transcrire cet enregistrement.'
@@ -178,6 +192,18 @@ async function toggleRecording() {
     feedback.value = 'Autorisation microphone refusée ou indisponible.'
   }
 }
+
+function applyCompletedTranscription(event: Event) {
+  const detail = (event as CustomEvent<{ intentId: string, text: string }>).detail
+  if (!detail || detail.intentId !== audioIntentId.value)
+    return
+  if (detail.text)
+    notes.value = [notes.value.trim(), detail.text].filter(Boolean).join('\n')
+  feedback.value = detail.text ? 'Transcription ajoutée à la note.' : 'Aucun texte détecté dans l’enregistrement.'
+}
+
+onMounted(() => window.addEventListener('forus:transcription-complete', applyCompletedTranscription))
+onUnmounted(() => window.removeEventListener('forus:transcription-complete', applyCompletedTranscription))
 
 async function completeFollowUp(carrier: NonNullable<typeof queue.value>[number]) {
   if (!carrier.followUp)
@@ -199,9 +225,6 @@ async function completeFollowUp(carrier: NonNullable<typeof queue.value>[number]
   <div class="calling-page page-container">
     <section class="calling-hero">
       <div>
-        <p class="calling-kicker">
-          Poste calling
-        </p>
         <h1>Les appels qui font avancer la journée.</h1>
         <p class="calling-subtitle">
           Regardez la demande, puis appelez le bon transporteur.
@@ -222,9 +245,6 @@ async function completeFollowUp(carrier: NonNullable<typeof queue.value>[number]
     <section id="active-needs" class="calling-brief" aria-labelledby="active-needs-title">
       <div class="calling-section-heading">
         <div>
-          <p class="calling-kicker">
-            À pourvoir maintenant
-          </p>
           <h2 id="active-needs-title">
             Demandes en cours
           </h2>
@@ -298,9 +318,6 @@ async function completeFollowUp(carrier: NonNullable<typeof queue.value>[number]
     <section v-if="followUps.length" class="calling-followups" aria-labelledby="followups-title">
       <div class="calling-section-heading">
         <div>
-          <p class="calling-kicker">
-            À ne pas oublier
-          </p>
           <h2 id="followups-title">
             Rappels à faire
           </h2>
@@ -325,9 +342,6 @@ async function completeFollowUp(carrier: NonNullable<typeof queue.value>[number]
     <section id="calling-contacts" class="calling-contacts" aria-labelledby="calling-contacts-title">
       <div class="calling-section-heading">
         <div>
-          <p class="calling-kicker">
-            Votre portefeuille
-          </p>
           <h2 id="calling-contacts-title">
             Contacts à appeler
           </h2>
@@ -410,16 +424,22 @@ async function completeFollowUp(carrier: NonNullable<typeof queue.value>[number]
                   <dd>{{ formatDateTime(carrier.followUp.dueAt) }}<span v-if="carrier.followUp.notes"> · {{ carrier.followUp.notes }}</span></dd>
                 </div>
               </dl>
+              <button class="calling-log-action focus-ring" type="button" @click.stop="openManualCallRecap(carrier)">
+                <span class="i-carbon-edit" />
+                Saisir le résultat
+              </button>
             </div>
           </div>
         </Transition>
         <div class="calling-actions" @click.stop>
-          <AppButton block size="lg" class="calling-button" @click="openCall(carrier)">
-            <template #leading>
-              <span class="i-carbon-phone-filled" />
-            </template>
+          <a
+            :href="buildPhoneUrl(carrier.phone)"
+            class="calling-button focus-ring"
+            @click="startQuickDial(carrier)"
+          >
+            <span class="i-carbon-phone-filled" />
             Appeler maintenant
-          </AppButton>
+          </a>
           <a
             :href="carrierWhatsAppUrl(carrier)"
             target="_blank"
@@ -474,19 +494,11 @@ async function completeFollowUp(carrier: NonNullable<typeof queue.value>[number]
   padding: 1.25rem;
   border: 1px solid var(--color-border);
   border-radius: 1.25rem;
-  background: linear-gradient(135deg, var(--color-surface), var(--color-surface-soft));
+  background: var(--color-surface);
 }
 .calling-counts {
   display: flex;
   align-items: stretch;
-}
-.calling-kicker {
-  margin: 0 0 0.35rem;
-  color: var(--color-accent);
-  font-size: 0.68rem;
-  font-weight: 800;
-  letter-spacing: 0.16em;
-  text-transform: uppercase;
 }
 .calling-hero h1,
 .calling-section-heading h2,
@@ -494,8 +506,8 @@ async function completeFollowUp(carrier: NonNullable<typeof queue.value>[number]
   margin: 0;
 }
 .calling-hero h1 {
-  font-size: clamp(1.4rem, 5vw, 2.35rem);
-  letter-spacing: -0.04em;
+  font-size: 1.8rem;
+  letter-spacing: -0.035em;
 }
 .calling-subtitle {
   margin: 0.45rem 0 0;
@@ -536,9 +548,9 @@ async function completeFollowUp(carrier: NonNullable<typeof queue.value>[number]
 .calling-followups {
   margin-bottom: 1.25rem;
   padding: 1rem;
-  border: 1px solid rgb(245 165 36 / 35%);
+  border: 1px solid color-mix(in srgb, var(--color-warning) 40%, var(--color-border));
   border-radius: 1.25rem;
-  background: rgb(245 165 36 / 8%);
+  background: color-mix(in srgb, var(--color-warning) 8%, var(--color-surface));
 }
 .calling-brief,
 .calling-contacts {
@@ -549,7 +561,7 @@ async function completeFollowUp(carrier: NonNullable<typeof queue.value>[number]
   background: var(--color-surface);
 }
 .calling-brief {
-  background: linear-gradient(90deg, rgb(32 199 183 / 7%), transparent 38%), var(--color-surface);
+  background: var(--color-surface);
 }
 .calling-brief-note {
   color: var(--color-text-muted);
@@ -570,9 +582,8 @@ async function completeFollowUp(carrier: NonNullable<typeof queue.value>[number]
 .calling-need {
   padding: 0.9rem;
   border: 1px solid var(--color-border);
-  border-left: 3px solid var(--color-accent);
   border-radius: 0.85rem;
-  background: var(--color-bg-deep);
+  background: var(--color-surface-raised);
   cursor: pointer;
   transition:
     border-color 180ms ease,
@@ -733,6 +744,22 @@ async function completeFollowUp(carrier: NonNullable<typeof queue.value>[number]
   display: flex;
   gap: 0.65rem;
 }
+.calling-log-action {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  min-height: 2.75rem;
+  margin-top: 0.75rem;
+  padding: 0.5rem 0.2rem;
+  border: 0;
+  background: transparent;
+  color: var(--color-text-muted);
+  font-size: 0.78rem;
+  font-weight: 700;
+}
+.calling-log-action:hover {
+  color: var(--color-accent);
+}
 .calling-expand-shell {
   display: grid;
   grid-template-rows: 1fr;
@@ -785,10 +812,29 @@ async function completeFollowUp(carrier: NonNullable<typeof queue.value>[number]
   opacity: 0;
 }
 .calling-button {
+  display: inline-flex;
   flex: 1;
-}
-.calling-button :deep(button) {
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
   min-height: 3.25rem;
+  padding: 0.75rem 1.25rem;
+  border: 1px solid var(--color-accent);
+  border-radius: 0.75rem;
+  background: var(--color-accent);
+  color: var(--color-button-text);
+  font-size: 1rem;
+  font-weight: 700;
+  text-decoration: none;
+  transition:
+    background 150ms ease,
+    transform 150ms ease;
+}
+.calling-button:hover {
+  background: var(--color-accent-strong);
+}
+.calling-button:active {
+  transform: scale(0.98);
 }
 .calling-whatsapp {
   display: inline-flex;

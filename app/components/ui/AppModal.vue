@@ -1,10 +1,20 @@
 <script setup lang="ts">
+import { nextTick, useTemplateRef, watch } from 'vue'
+
 defineProps<{
   title: string
   description?: string
 }>()
 
 const open = defineModel<boolean>({ default: false })
+const dialogRef = useTemplateRef<HTMLElement>('dialog')
+
+watch(open, async (isOpen) => {
+  if (!isOpen)
+    return
+  await nextTick()
+  dialogRef.value?.focus()
+})
 
 function close() {
   open.value = false
@@ -26,10 +36,13 @@ function close() {
         @click.self="close"
       >
         <section
+          ref="dialog"
           class="p-5 border border-[var(--color-border)] rounded-t-3xl bg-[var(--color-surface)] max-h-[90vh] max-w-lg w-full shadow-2xl overflow-y-auto sm:rounded-2xl"
           role="dialog"
           aria-modal="true"
           :aria-label="title"
+          tabindex="-1"
+          @keydown.esc.stop="close"
         >
           <header class="mb-5 flex gap-4 items-start justify-between">
             <div>

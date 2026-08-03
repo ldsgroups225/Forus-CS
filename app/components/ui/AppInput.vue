@@ -27,6 +27,6 @@ const model = defineModel<string | number | undefined>()
     :min="min"
     :max="max"
     :step="step"
-    class="text-sm text-[var(--color-text)] px-3.5 py-2.5 border border-[var(--color-border)] rounded-xl bg-[var(--color-bg-deep)] min-h-11 w-full placeholder:text-[var(--color-text-subtle)] disabled:opacity-60 disabled:cursor-not-allowed focus-ring"
+    class="text-sm text-[var(--color-text)] px-3.5 py-2.5 border border-[var(--color-border)] rounded-xl bg-[var(--color-bg-deep)] min-h-11 w-full transition-colors placeholder:text-[var(--color-text-subtle)] hover:border-[var(--color-border-strong)] disabled:opacity-60 disabled:cursor-not-allowed focus-ring"
   >
 </template>

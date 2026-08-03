@@ -11,18 +11,25 @@ export type OfflineMutationState = 'waiting' | 'sending' | 'failed'
 
 export interface OfflineMutationIntent {
   id: string
+  ownerId: string
   organizationId: string
   operation: OfflineOperation
   payload: string
   createdAt: number
   attempts: number
   state: OfflineMutationState
+  retryAfter?: number
   lastError?: string
 }
 
 const databaseName = 'forus-cs-offline'
 const storeName = 'mutation-queue'
 const databaseVersion = 1
+
+function retryAfter(attempts: number) {
+  const delay = Math.min(1000 * 60 * 5, 1000 * 5 * 2 ** Math.min(attempts, 6))
+  return Date.now() + delay + Math.round(Math.random() * 1000)
+}
 
 function requestResult<T>(request: IDBRequest<T>) {
   return new Promise<T>((resolve, reject) => {
@@ -57,17 +64,20 @@ class IndexedDbOfflineMutationQueue {
     return this.databasePromise
   }
 
-  async list() {
+  async list(ownerId?: string) {
     const database = await this.openDatabase()
     const transaction = database.transaction(storeName, 'readonly')
     const result = await requestResult(
       transaction.objectStore(storeName).getAll() as IDBRequest<OfflineMutationIntent[]>,
     )
     await transactionDone(transaction)
-    return result.sort((left, right) => left.createdAt - right.createdAt)
+    return result
+      .filter(intent => !ownerId || intent.ownerId === ownerId)
+      .sort((left, right) => left.createdAt - right.createdAt)
   }
 
   async enqueue(input: {
+    ownerId: string
     organizationId: string
     operation: OfflineOperation
     payload: unknown
@@ -75,6 +85,7 @@ class IndexedDbOfflineMutationQueue {
   }) {
     const intent: OfflineMutationIntent = {
       id: input.id ?? crypto.randomUUID(),
+      ownerId: input.ownerId,
       organizationId: input.organizationId,
       operation: input.operation,
       payload: JSON.stringify(input.payload),
@@ -100,9 +111,18 @@ class IndexedDbOfflineMutationQueue {
     await transactionDone(transaction)
   }
 
-  async flush(sender: (intent: OfflineMutationIntent) => Promise<void>) {
-    const intents = await this.list()
+  async clear() {
+    const database = await this.openDatabase()
+    const transaction = database.transaction(storeName, 'readwrite')
+    transaction.objectStore(storeName).clear()
+    await transactionDone(transaction)
+  }
+
+  async flush(ownerId: string, sender: (intent: OfflineMutationIntent) => Promise<void>) {
+    const intents = await this.list(ownerId)
     for (const intent of intents) {
+      if (intent.retryAfter && intent.retryAfter > Date.now())
+        continue
       const sending = {
         ...intent,
         attempts: intent.attempts + 1,
@@ -117,7 +137,8 @@ class IndexedDbOfflineMutationQueue {
       catch (cause) {
         await this.put({
           ...sending,
-          state: 'failed',
+          state: 'waiting',
+          retryAfter: retryAfter(sending.attempts),
           lastError: cause instanceof Error ? cause.message : 'OFFLINE_SYNC_FAILED',
         })
         if (!navigator.onLine)

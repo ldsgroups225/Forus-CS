@@ -28,6 +28,7 @@ import type * as lib_carrierAuthz from "../lib/carrierAuthz.js";
 import type * as lib_idempotency from "../lib/idempotency.js";
 import type * as lib_needs from "../lib/needs.js";
 import type * as lib_notifications from "../lib/notifications.js";
+import type * as lib_reportAggregates from "../lib/reportAggregates.js";
 import type * as lib_workflow from "../lib/workflow.js";
 import type * as matching from "../matching.js";
 import type * as memberships from "../memberships.js";
@@ -36,8 +37,12 @@ import type * as needs from "../needs.js";
 import type * as notifications from "../notifications.js";
 import type * as organizations from "../organizations.js";
 import type * as portfolios from "../portfolios.js";
+import type * as presence from "../presence.js";
+import type * as reportAggregateMigrations from "../reportAggregateMigrations.js";
 import type * as reports from "../reports.js";
 import type * as seed from "../seed.js";
+import type * as transcriptionActions from "../transcriptionActions.js";
+import type * as transcriptions from "../transcriptions.js";
 import type * as vehicles from "../vehicles.js";
 
 import type {
@@ -67,6 +72,7 @@ declare const fullApi: ApiFromModules<{
   "lib/idempotency": typeof lib_idempotency;
   "lib/needs": typeof lib_needs;
   "lib/notifications": typeof lib_notifications;
+  "lib/reportAggregates": typeof lib_reportAggregates;
   "lib/workflow": typeof lib_workflow;
   matching: typeof matching;
   memberships: typeof memberships;
@@ -75,8 +81,12 @@ declare const fullApi: ApiFromModules<{
   notifications: typeof notifications;
   organizations: typeof organizations;
   portfolios: typeof portfolios;
+  presence: typeof presence;
+  reportAggregateMigrations: typeof reportAggregateMigrations;
   reports: typeof reports;
   seed: typeof seed;
+  transcriptionActions: typeof transcriptionActions;
+  transcriptions: typeof transcriptions;
   vehicles: typeof vehicles;
 }>;
 
@@ -108,4 +118,12 @@ export declare const internal: FilterApi<
 
 export declare const components: {
   betterAuth: import("@convex-dev/better-auth/_generated/component.js").ComponentApi<"betterAuth">;
+  rateLimiter: import("@convex-dev/rate-limiter/_generated/component.js").ComponentApi<"rateLimiter">;
+  actionCache: import("@convex-dev/action-cache/_generated/component.js").ComponentApi<"actionCache">;
+  presence: import("@convex-dev/presence/_generated/component.js").ComponentApi<"presence">;
+  transcriptionWorkpool: import("@convex-dev/workpool/_generated/component.js").ComponentApi<"transcriptionWorkpool">;
+  reportEvents: import("@convex-dev/aggregate/_generated/component.js").ComponentApi<"reportEvents">;
+  callsByOrganization: import("@convex-dev/aggregate/_generated/component.js").ComponentApi<"callsByOrganization">;
+  availableCallsByOrganization: import("@convex-dev/aggregate/_generated/component.js").ComponentApi<"availableCallsByOrganization">;
+  callsByAgent: import("@convex-dev/aggregate/_generated/component.js").ComponentApi<"callsByAgent">;
 };

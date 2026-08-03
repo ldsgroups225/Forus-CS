@@ -66,6 +66,7 @@ async function markAllRead() {
       <div class="hidden sm:block">
         <NetworkStatus />
       </div>
+      <TeamPresence />
       <div class="relative">
         <button class="icon-btn relative" type="button" aria-label="Notifications" :aria-expanded="notificationsOpen" @click="notificationsOpen = !notificationsOpen">
           <span class="i-carbon-notification" />

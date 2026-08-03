@@ -96,18 +96,13 @@ async function createClient() {
 
 <template>
   <div class="page-container">
-    <div class="mb-6">
-      <button class="text-xs text-[var(--color-text-muted)] font-700 mb-4 inline-flex gap-2 items-center hover:text-[var(--color-accent)]" @click="$router.back()">
+    <div class="mb-5">
+      <button class="text-xs text-[var(--color-text-muted)] font-700 inline-flex gap-2 min-h-11 items-center hover:text-[var(--color-accent)] focus-ring" @click="$router.back()">
         <span class="i-carbon-arrow-left" />
         Retour aux besoins
       </button>
-      <h1 class="text-2xl font-900 m-0 sm:text-3xl">
-        Créer un besoin opérationnel
-      </h1>
-      <p class="text-sm text-[var(--color-text-muted)] mb-0 mt-2">
-        Enregistrez un brouillon ou publiez immédiatement le besoin à l’équipe.
-      </p>
     </div>
+    <AppPageHeader title="Créer un besoin opérationnel" description="Enregistrez un brouillon ou publiez immédiatement le besoin à l’équipe." />
 
     <p v-if="errorMessage" class="text-sm text-red-300 mb-5 px-4 py-3 border border-red-500/25 rounded-xl bg-red-500/10" role="alert">
       {{ errorMessage }}

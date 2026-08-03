@@ -207,25 +207,16 @@ async function createCarrier() {
 
 <template>
   <div class="page-container">
-    <div class="mb-6 flex flex-col gap-4 xl:flex-row xl:items-end xl:justify-between">
-      <div>
-        <p class="text-xs text-[var(--color-accent)] tracking-[0.16em] font-800 mb-1 uppercase">
-          CRM réseau transporteurs
-        </p>
-        <h1 class="text-2xl font-900 m-0 sm:text-3xl">
-          Transporteurs
-        </h1>
-        <p class="text-sm text-[var(--color-text-muted)] mb-0 mt-2">
-          Portefeuilles, flotte, conformité, disponibilité et historique d’appels.
-        </p>
-      </div>
-      <AppButton @click="formOpen = true">
-        <template #leading>
-          <span class="i-carbon-add" />
-        </template>
-        Ajouter un transporteur
-      </AppButton>
-    </div>
+    <AppPageHeader title="Transporteurs" description="Portefeuilles, flotte, conformité, disponibilité et historique d’appels.">
+      <template #actions>
+        <AppButton @click="formOpen = true">
+          <template #leading>
+            <span class="i-carbon-add" />
+          </template>
+          Ajouter un transporteur
+        </AppButton>
+      </template>
+    </AppPageHeader>
 
     <div class="mb-5 gap-3 grid grid-cols-2 lg:grid-cols-4">
       <AppCard>

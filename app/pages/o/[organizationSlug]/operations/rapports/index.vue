@@ -50,25 +50,16 @@ function exportCsv() {
 
 <template>
   <div class="page-container">
-    <div class="mb-6 flex flex-col gap-4 xl:flex-row xl:items-end xl:justify-between">
-      <div>
-        <p class="text-xs text-[var(--color-accent)] tracking-[0.16em] font-800 mb-1 uppercase">
-          Pilotage opérationnel
-        </p>
-        <h1 class="text-2xl font-900 m-0 sm:text-3xl">
-          Rapports et KPI
-        </h1>
-        <p class="text-sm text-[var(--color-text-muted)] mb-0 mt-2">
-          Besoins, missions, appels, incidents et performance agents sur la période.
-        </p>
-      </div>
-      <AppButton variant="secondary" :disabled="!overview" @click="exportCsv">
-        <template #leading>
-          <span class="i-carbon-download" />
-        </template>
-        Exporter en CSV
-      </AppButton>
-    </div>
+    <AppPageHeader title="Rapports et KPI" description="Besoins, missions, appels, incidents et performance agents sur la période.">
+      <template #actions>
+        <AppButton variant="secondary" :disabled="!overview" @click="exportCsv">
+          <template #leading>
+            <span class="i-carbon-download" />
+          </template>
+          Exporter en CSV
+        </AppButton>
+      </template>
+    </AppPageHeader>
 
     <AppCard class="mb-5">
       <div class="gap-4 grid xl:grid-cols-[12rem_12rem_1fr] sm:grid-cols-2 xl:items-end">

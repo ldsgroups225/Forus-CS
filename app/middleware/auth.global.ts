@@ -1,3 +1,4 @@
+import { canAccessOfflineRoute, getOfflineAccess, rememberOfflineAccess } from '~/lib/offline-access'
 import { api } from '../../convex/_generated/api'
 
 const publicRoutes = new Set([
@@ -19,6 +20,16 @@ export default defineNuxtRouteMiddleware(async (to) => {
   const { $authClient, $convex, $ensureConvexAuth } = useNuxtApp()
   const isInvitationRoute = to.path.startsWith('/invite/')
   const isPublic = publicRoutes.has(to.path) || isInvitationRoute
+  const offlineHome = () => {
+    const offlineAccess = getOfflineAccess()
+    if (!offlineAccess || to.path !== '/')
+      return
+    const cachedSlug = getCachedOrganizationSlug()
+    const organizationSlug = cachedSlug && offlineAccess.organizationSlugs.includes(cachedSlug)
+      ? cachedSlug
+      : offlineAccess.organizationSlugs[0]
+    return organizationSlug ? navigateTo(`/o/${organizationSlug}/operations`) : undefined
+  }
   let response: Awaited<ReturnType<typeof $authClient.getSession>>
 
   try {
@@ -28,22 +39,34 @@ export default defineNuxtRouteMiddleware(async (to) => {
     if (isPublic)
       return
 
-    if (!navigator.onLine)
+    if (!navigator.onLine) {
+      const offlineHomeDestination = offlineHome()
+      if (offlineHomeDestination)
+        return offlineHomeDestination
+      if (canAccessOfflineRoute(to.path))
+        return
       return navigateTo({ path: '/offline', query: { redirect: to.fullPath } })
+    }
 
     return navigateTo({ path: '/loading', query: { redirect: to.fullPath } })
   }
 
   const isAuthenticated = Boolean(response.data?.user)
 
-  if (!isAuthenticated && !isPublic)
+  if (!isAuthenticated && !isPublic) {
+    if (!navigator.onLine && canAccessOfflineRoute(to.path))
+      return
     return navigateTo({ path: '/login', query: { redirect: to.fullPath } })
+  }
 
   if (!isAuthenticated)
     return
 
-  if (!await $ensureConvexAuth())
+  if (!await $ensureConvexAuth()) {
+    if (!navigator.onLine && canAccessOfflineRoute(to.path))
+      return
     return navigateTo({ path: '/login', query: { redirect: to.fullPath } })
+  }
 
   if (isInvitationRoute)
     return
@@ -52,6 +75,10 @@ export default defineNuxtRouteMiddleware(async (to) => {
     return navigateTo(await destinationAfterAuthentication($convex))
 
   const organizations = await $convex.query(api.organizations.listForCurrentUser, {})
+  rememberOfflineAccess({
+    userId: response.data!.user.id,
+    organizationSlugs: organizations.map(organization => organization.slug),
+  })
 
   if (to.path === '/') {
     const cachedSlug = getCachedOrganizationSlug()

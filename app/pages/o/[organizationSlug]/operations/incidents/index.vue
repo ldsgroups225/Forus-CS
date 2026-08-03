@@ -191,25 +191,16 @@ async function updateIncident() {
 
 <template>
   <div class="page-container">
-    <div class="mb-6 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
-      <div>
-        <p class="text-xs text-[var(--color-accent)] tracking-[0.16em] font-800 mb-1 uppercase">
-          Exécution et qualité
-        </p>
-        <h1 class="text-2xl font-900 m-0 sm:text-3xl">
-          Incidents
-        </h1>
-        <p class="text-sm text-[var(--color-text-muted)] mb-0 mt-2">
-          Déclaration, affectation, résolution et traçabilité des aléas opérationnels.
-        </p>
-      </div>
-      <AppButton @click="formOpen = true">
-        <template #leading>
-          <span class="i-carbon-warning-alt" />
-        </template>
-        Déclarer un incident
-      </AppButton>
-    </div>
+    <AppPageHeader title="Incidents" description="Déclaration, affectation, résolution et traçabilité des aléas opérationnels.">
+      <template #actions>
+        <AppButton @click="formOpen = true">
+          <template #leading>
+            <span class="i-carbon-warning-alt" />
+          </template>
+          Déclarer un incident
+        </AppButton>
+      </template>
+    </AppPageHeader>
 
     <div class="mb-5 gap-3 grid grid-cols-2 lg:grid-cols-4">
       <AppCard>

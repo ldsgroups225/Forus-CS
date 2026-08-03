@@ -14,6 +14,18 @@ test('connexion, validation et navigation vers l’inscription', async ({ page }
   await expect(page.getByRole('heading', { name: 'Créer votre compte' })).toBeVisible()
 })
 
+test('le parcours invitation conserve le redirect entre connexion et inscription', async ({ page }) => {
+  await page.goto('/login?redirect=/invite/demo-code')
+
+  await page.getByRole('link', { name: 'Créer un compte' }).click()
+  await expect(page).toHaveURL(/\/register\?redirect=/)
+  expect(new URL(page.url()).searchParams.get('redirect')).toBe('/invite/demo-code')
+
+  await page.getByRole('link', { name: 'Se connecter' }).click()
+  await expect(page).toHaveURL(/\/login\?redirect=/)
+  expect(new URL(page.url()).searchParams.get('redirect')).toBe('/invite/demo-code')
+})
+
 test('validation locale de l’inscription', async ({ page }) => {
   await page.goto('/register')
   await page.getByLabel('Nom complet').fill('Responsable E2E')

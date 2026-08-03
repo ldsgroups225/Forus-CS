@@ -13,12 +13,23 @@ const loading = ref(false)
 const { data: authCapabilities } = useConvexQuery(api.auth.getCapabilities, {})
 const hasSocialProviders = computed(() =>
   Boolean(authCapabilities.value?.google || authCapabilities.value?.github))
+const redirectAfterAuthentication = computed(() => {
+  const redirect = typeof route.query.redirect === 'string' ? route.query.redirect : ''
+  return redirect.startsWith('/') && !redirect.startsWith('//')
+    ? redirect
+    : ''
+})
+const registerLocation = computed(() => {
+  return redirectAfterAuthentication.value
+    ? { path: '/register', query: { redirect: redirectAfterAuthentication.value } }
+    : '/register'
+})
 
 async function signInWith(provider: 'google' | 'github') {
   errorMessage.value = ''
   loading.value = true
   try {
-    const redirect = typeof route.query.redirect === 'string' ? route.query.redirect : '/'
+    const redirect = redirectAfterAuthentication.value || '/'
     const response = await authClient.signIn.social({
       provider,
       callbackURL: new URL(redirect, window.location.origin).toString(),
@@ -60,10 +71,8 @@ async function submit() {
       errorMessage.value = 'La session est créée, mais l’accès aux données n’est pas encore disponible.'
       return
     }
-    const redirect = typeof route.query.redirect === 'string'
-      ? route.query.redirect
-      : await destinationAfterAuthentication($convex)
-    await navigateTo(redirect)
+    const fallback = await destinationAfterAuthentication($convex)
+    await navigateTo(redirectAfterAuthentication.value || fallback)
   }
   catch {
     errorMessage.value = 'Le service de connexion est momentanément indisponible.'
@@ -146,7 +155,7 @@ async function submit() {
 
     <p class="text-sm text-[var(--color-text-muted)] mb-0 mt-6 text-center">
       Première visite ?
-      <NuxtLink to="/register" class="text-[var(--color-accent)] font-800 hover:underline">
+      <NuxtLink :to="registerLocation" class="text-[var(--color-accent)] font-800 hover:underline">
         Créer un compte
       </NuxtLink>
     </p>

@@ -92,7 +92,6 @@ export const preview = query({
     code: v.string(),
   },
   handler: async (ctx, args) => {
-    await requireAuthenticatedUser(ctx)
     const invitation = await ctx.db
       .query('invitations')
       .withIndex('by_code', query => query.eq('code', args.code))

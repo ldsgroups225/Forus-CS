@@ -1,6 +1,8 @@
 <script setup lang="ts">
 definePageMeta({ layout: 'auth' })
 
+const route = useRoute()
+const { $ensureConvexAuth } = useNuxtApp()
 const { authClient, session } = useAuth()
 const name = ref('')
 const email = ref('')
@@ -9,6 +11,17 @@ const confirmation = ref('')
 const errorMessage = ref('')
 const successMessage = ref('')
 const loading = ref(false)
+const redirectAfterRegistration = computed(() => {
+  const redirect = typeof route.query.redirect === 'string' ? route.query.redirect : ''
+  return redirect.startsWith('/') && !redirect.startsWith('//')
+    ? redirect
+    : '/onboarding/organization'
+})
+const loginLocation = computed(() => {
+  return redirectAfterRegistration.value !== '/onboarding/organization'
+    ? { path: '/login', query: { redirect: redirectAfterRegistration.value } }
+    : '/login'
+})
 
 async function submit() {
   errorMessage.value = ''
@@ -49,7 +62,8 @@ async function submit() {
       successMessage.value = 'Compte créé. Consultez votre e-mail pour confirmer votre adresse avant de vous connecter.'
       return
     }
-    await navigateTo('/onboarding/organization')
+    await $ensureConvexAuth()
+    await navigateTo(redirectAfterRegistration.value)
   }
   catch {
     errorMessage.value = 'Le service d’inscription est momentanément indisponible.'
@@ -102,7 +116,7 @@ async function submit() {
 
     <p class="text-sm text-[var(--color-text-muted)] mb-0 mt-6 text-center">
       Déjà inscrit ?
-      <NuxtLink to="/login" class="text-[var(--color-accent)] font-800 hover:underline">
+      <NuxtLink :to="loginLocation" class="text-[var(--color-accent)] font-800 hover:underline">
         Se connecter
       </NuxtLink>
     </p>

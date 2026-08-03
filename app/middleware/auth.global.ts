@@ -16,7 +16,8 @@ export default defineNuxtRouteMiddleware(async (to) => {
     return
 
   const { $authClient, $convex, $ensureConvexAuth } = useNuxtApp()
-  const isPublic = publicRoutes.has(to.path)
+  const isInvitationRoute = to.path.startsWith('/invite/')
+  const isPublic = publicRoutes.has(to.path) || isInvitationRoute
   let response: Awaited<ReturnType<typeof $authClient.getSession>>
 
   try {
@@ -40,6 +41,9 @@ export default defineNuxtRouteMiddleware(async (to) => {
   if (!await $ensureConvexAuth())
     return navigateTo({ path: '/login', query: { redirect: to.fullPath } })
 
+  if (isInvitationRoute)
+    return
+
   if (to.path === '/login' || to.path === '/register')
     return navigateTo(await destinationAfterAuthentication($convex))
 
@@ -56,9 +60,6 @@ export default defineNuxtRouteMiddleware(async (to) => {
       return navigateTo(`/o/${first.slug}/operations`)
     return
   }
-
-  if (to.path.startsWith('/invite/'))
-    return
 
   if (organizations.length === 0)
     return navigateTo('/onboarding/organization')

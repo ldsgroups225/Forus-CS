@@ -2,12 +2,14 @@
 import type { OrganizationRole } from '~~/shared/domain'
 import type { Id } from '../../../../../../convex/_generated/dataModel'
 import { invitationStatusLabels, roleLabels } from '~~/shared/domain'
+import { buildInvitationUrl } from '~~/shared/invitations'
 import { formatCurrency, formatDateTime } from '~/utils/formatters'
 import { api } from '../../../../../../convex/_generated/api'
 
 definePageMeta({ layout: 'operations' })
 
 const { $convex } = useNuxtApp()
+const runtimeConfig = useRuntimeConfig()
 const { organization } = useCurrentOrganization()
 const organizationArgs = computed(() => organization.value
   ? { organizationId: organization.value._id }
@@ -33,6 +35,7 @@ const feedback = shallowRef('')
 const inviteOpen = shallowRef(false)
 const callingAgentName = shallowRef('')
 const invitationLink = shallowRef('')
+const copiedInvitationId = shallowRef('')
 const settingsForm = reactive({
   name: '',
   timezone: 'Africa/Abidjan',
@@ -66,6 +69,31 @@ const agentLinkOptions = computed(() => [
       label: member.displayName ?? member.email ?? member.userId,
     })),
 ])
+
+function invitationUrl(code: string) {
+  return buildInvitationUrl(
+    runtimeConfig.public.siteUrl,
+    import.meta.client ? window.location.origin : undefined,
+    code,
+  )
+}
+
+async function writeClipboard(text: string) {
+  if (navigator.clipboard?.writeText) {
+    await navigator.clipboard.writeText(text)
+    return
+  }
+
+  const textarea = document.createElement('textarea')
+  textarea.value = text
+  textarea.setAttribute('readonly', '')
+  textarea.style.position = 'fixed'
+  textarea.style.left = '-9999px'
+  document.body.appendChild(textarea)
+  textarea.select()
+  document.execCommand('copy')
+  document.body.removeChild(textarea)
+}
 
 watch(
   [organization, settings],
@@ -119,7 +147,7 @@ async function createInvitation() {
       email: inviteForm.email,
       role: inviteForm.role,
     })
-    invitationLink.value = `${window.location.origin}/invite/${result.code}`
+    invitationLink.value = invitationUrl(result.code)
     feedback.value = 'Invitation créée. Copiez le lien sécurisé pour l’envoyer au membre.'
   }
   catch {
@@ -131,7 +159,13 @@ async function createInvitation() {
 }
 
 async function copyInvitation() {
-  await navigator.clipboard.writeText(invitationLink.value)
+  await writeClipboard(invitationLink.value)
+  feedback.value = 'Lien d’invitation copié.'
+}
+
+async function copyInvitationLink(invitationId: string, code: string) {
+  await writeClipboard(invitationUrl(code))
+  copiedInvitationId.value = invitationId
   feedback.value = 'Lien d’invitation copié.'
 }
 
@@ -394,12 +428,29 @@ async function revokeInvitation(invitationId: Id<'invitations'>) {
           Aucune invitation créée.
         </p>
         <div v-else class="mt-4 space-y-2">
-          <div v-for="invitation in invitations" :key="invitation._id" class="text-sm p-3 rounded-xl bg-[var(--color-bg-deep)] flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-            <div><strong>{{ invitation.email }}</strong><span class="text-xs text-[var(--color-text-muted)] mt-1 block">{{ roleLabels[invitation.role] }} · expire {{ formatDateTime(invitation.expiresAt) }}</span></div>
-            <div class="flex gap-2 items-center">
-              <AppBadge :tone="invitation.effectiveStatus === 'PENDING' ? 'warning' : invitation.effectiveStatus === 'ACCEPTED' ? 'success' : 'neutral'">
-                {{ invitationStatusLabels[invitation.effectiveStatus] }}
-              </AppBadge><AppButton v-if="invitation.effectiveStatus === 'PENDING'" size="sm" variant="ghost" @click="revokeInvitation(invitation._id)">
+          <div v-for="invitation in invitations" :key="invitation._id" class="text-sm p-3 rounded-xl bg-[var(--color-bg-deep)] flex flex-col gap-3">
+            <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+              <div>
+                <strong>{{ invitation.email }}</strong>
+                <span class="text-xs text-[var(--color-text-muted)] mt-1 block">{{ roleLabels[invitation.role] }} · expire {{ formatDateTime(invitation.expiresAt) }}</span>
+              </div>
+              <div class="flex gap-2 items-center">
+                <AppBadge :tone="invitation.effectiveStatus === 'PENDING' ? 'warning' : invitation.effectiveStatus === 'ACCEPTED' ? 'success' : 'neutral'">
+                  {{ invitationStatusLabels[invitation.effectiveStatus] }}
+                </AppBadge>
+              </div>
+            </div>
+            <div v-if="invitation.effectiveStatus === 'PENDING'" class="gap-2 grid sm:grid-cols-[minmax(0,1fr)_auto_auto] sm:items-center">
+              <p class="text-xs text-[var(--color-text-muted)] m-0 px-3 py-2 border border-[var(--color-border)] rounded-xl bg-[var(--color-surface)] break-all">
+                {{ invitationUrl(invitation.code) }}
+              </p>
+              <AppButton size="sm" variant="secondary" @click="copyInvitationLink(invitation._id, invitation.code)">
+                <template #leading>
+                  <span class="i-carbon-copy" />
+                </template>
+                {{ copiedInvitationId === invitation._id ? 'Copié' : 'Copier' }}
+              </AppButton>
+              <AppButton size="sm" variant="ghost" @click="revokeInvitation(invitation._id)">
                 Révoquer
               </AppButton>
             </div>
